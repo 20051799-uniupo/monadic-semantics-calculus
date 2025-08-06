@@ -1,0 +1,46 @@
+cabal-version: 2.2
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           monadic-semantic-calculus
+version:        0.1.0.0
+homepage:       https://gitlab.di.unipmn.it/20041679/monadic-semantic-calculus
+author:         20051799
+maintainer:     20051799@studenti.uniupo.com
+license:        BSD-3-Clause
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    CHANGELOG.md
+
+library
+  exposed-modules:
+      Lib
+      Effects.Nondeterminism
+  other-modules:
+      Paths_monadic_semantic_calculus
+  autogen-modules:
+      Paths_monadic_semantic_calculus
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  build-depends:
+      base >=4.7 && <5
+  default-language: Haskell2010
+
+executable monadic-semantic-calculus-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_monadic_semantic_calculus
+  autogen-modules:
+      Paths_monadic_semantic_calculus
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , monadic-semantic-calculus
+  default-language: Haskell2010
