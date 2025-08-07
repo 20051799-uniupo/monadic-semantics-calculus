@@ -7,7 +7,6 @@ module Effects.Nondeterminism (
 import Lib
 
 data NDSig = Choose
-    deriving (Show, Eq)
 
 instance Sig NDSig where
   arity Choose = 0
