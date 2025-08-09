@@ -2,7 +2,8 @@
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
 module Lib
-  ( Var,
+  ( 
+    Identifier,
     Val (..),
     Exp (..),
     Sig (..),
@@ -13,24 +14,24 @@ module Lib
   )
 where
 
-type Var = String
+type Identifier = String
 
 class Sig s where
   arity :: s -> Int
 
-data Val sig = I Int | Tru | Fls | Lam Var (Exp sig) | RecLam Var Var (Exp sig) | V Var
+data Val sig = Tru | Fls | Lam Identifier (Exp sig) | RecLam Identifier Identifier (Exp sig) | Vr Identifier
 
 data Exp sig
   = App (Val sig) (Val sig)
   | Ret (Val sig)
-  | Do Var (Exp sig) (Exp sig)
+  | Do Identifier (Exp sig) (Exp sig)
   | Magic sig [Val sig]
   | If (Val sig) (Exp sig) (Exp sig)
 
 class (Monad m, Sig sig) => MonSem m sig where
   run :: sig -> [Val sig] -> m (Val sig)
 
-subst :: Var -> Val sig -> Exp sig -> Exp sig
+subst :: Identifier -> Val sig -> Exp sig -> Exp sig
 subst varName val e = case e of
   App v1 v2 -> App (substVal varName val v1) (substVal varName val v2)
   Ret v -> Ret (substVal varName val v)
@@ -41,8 +42,8 @@ subst varName val e = case e of
   Magic s vs -> Magic s (substVal varName val <$> vs)
   If p bThen bElse -> If (substVal varName val p) (subst varName val bThen) (subst varName val bElse)
 
-substVal :: Var -> Val sig -> Val sig -> Val sig
-substVal varName val (V x) | x == varName = val
+substVal :: Identifier -> Val sig -> Val sig -> Val sig
+substVal varName val (Vr x) | x == varName = val
 substVal varName val (Lam x body)
   | x == varName = Lam x body
   | otherwise = Lam x (subst varName val body)
@@ -56,9 +57,9 @@ reduce e = case e of
   Magic op vs -> Ret <$> run op vs -- EFFECT
   Do var (Ret val) e2 -> pure $ subst var val e2 -- RET
   Do var e1 e2 -> Do var <$> reduce e1 <*> pure e2 -- DO
-  Ret _ -> pure e -- PURE
-  App (Lam var body) arg -> pure $ subst var arg body -- APP + PURE
-  App v@(RecLam f x body) arg -> pure $ (subst x arg . subst f v) body
+  App (Lam var body) arg -> pure $ subst var arg body -- PURE
+  App v@(RecLam f x body) arg -> pure $ (subst x arg . subst f v) body -- PURE
+  -- PURE
   If p bThen bElse ->
     pure
       ( case p of
