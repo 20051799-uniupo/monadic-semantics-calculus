@@ -12,4 +12,4 @@ instance Sig NDSig where
   arity Choose = 0
 
 instance MonSem [] NDSig where
-  run Choose _ = [Tru, Fls]
+  run Choose _ = [Bol True, Bol False]
