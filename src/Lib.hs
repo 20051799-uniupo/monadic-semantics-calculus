@@ -17,7 +17,7 @@ type Identifier = String
 class Sig s where
   arity :: s -> Int
 
-data Val sig = In Int | Tru | Fls | Lam Identifier (Exp sig) | RecLam Identifier Identifier (Exp sig) | Vr Identifier
+data Val sig = In Int | Bol Bool | Lam Identifier (Exp sig) | RecLam Identifier Identifier (Exp sig) | Vr Identifier
 
 data Exp sig
   = App (Val sig) (Val sig)
@@ -71,16 +71,16 @@ reduce e = case e of
       Nothing -> Nothing
   App (Lam var body) arg -> Just $ pure $ subst var arg body -- PURE
   App v@(RecLam f x body) arg -> Just $ pure $ (subst x arg . subst f v) body -- PURE
-  If Tru bThen _ -> Just $ pure bThen -- PURE
-  If Fls _ bElse -> Just $ pure bElse -- PURE
+  If (Bol True) bThen _ -> Just $ pure bThen -- PURE
+  If (Bol False) _ bElse -> Just $ pure bElse -- PURE
   Plus (In a) (In b) -> Just $ pure $ Ret $ In (a + b) -- PURE
   Minus (In a) (In b) -> Just $ pure $ Ret $ In (a - b) -- PURE
-  And (Tru) (Tru) -> Just $ pure $ Ret Tru -- PURE
-  And (_) (_) -> Just $ pure $ Ret Fls -- PURE
-  Or (Fls) (Fls) -> Just $ pure $ Ret Fls -- PURE
-  Or (_) (_) -> Just $ pure $ Ret Tru -- PURE
-  IsZero (In n) | n == 0 -> Just $ pure $ Ret Tru -- PURE
-  IsZero (In _) -> Just $ pure $ Ret Fls -- PURE
+  And (Bol True) (Bol True) -> Just $ pure $ Ret $ Bol True -- PURE
+  And (Bol _) (Bol _) -> Just $ pure $ Ret $ Bol False -- PURE
+  Or (Bol False) (Bol False) -> Just $ pure $ Ret $ Bol False -- PURE
+  Or (_) (_) -> Just $ pure $ Ret $ Bol True -- PURE
+  IsZero (In n) | n == 0 -> Just $ pure $ Ret $ Bol True -- PURE
+  IsZero (In _) -> Just $ pure $ Ret $ Bol False -- PURE
   _ -> Nothing
 
 data Res sig = Ok (Val sig) | Wr
