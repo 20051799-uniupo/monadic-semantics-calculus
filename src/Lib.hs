@@ -1,16 +1,14 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
 module Lib
-  ( 
-    Identifier,
+  ( Identifier,
     Val (..),
     Exp (..),
     Sig (..),
     MonSem (..),
     subst,
     substVal,
-    reduce,
+    -- reduce,
   )
 where
 
@@ -20,6 +18,7 @@ class Sig s where
   arity :: s -> Int
 
 data Val sig = Tru | Fls | Lam Identifier (Exp sig) | RecLam Identifier Identifier (Exp sig) | Vr Identifier
+
 
 data Exp sig
   = App (Val sig) (Val sig)
@@ -52,17 +51,30 @@ substVal varName val v@(RecLam f x body)
   | otherwise = RecLam f x (subst varName val body)
 substVal _ _ v = v
 
-reduce :: (MonSem m sig) => Exp sig -> m (Exp sig)
+reduce :: (MonSem m sig) => Exp sig -> Maybe (m (Exp sig))
 reduce e = case e of
-  Magic op vs -> Ret <$> run op vs -- EFFECT
-  Do var (Ret val) e2 -> pure $ subst var val e2 -- RET
-  Do var e1 e2 -> Do var <$> reduce e1 <*> pure e2 -- DO
-  App (Lam var body) arg -> pure $ subst var arg body -- PURE
-  App v@(RecLam f x body) arg -> pure $ (subst x arg . subst f v) body -- PURE
-  -- PURE
-  If p bThen bElse ->
-    pure
-      ( case p of
-          Tru -> bThen
-          Fls -> bElse
-      )
+  Magic op vs -> Just $ Ret <$> run op vs -- EFFECT
+  Do var (Ret val) e2 -> Just $ pure $ subst var val e2 -- RET
+  Do var e1 e2 -> -- DO
+    case reduce e1 of
+      Just m_e1' -> Just $ (\e1' -> Do var e1 e2) <$> m_e1'
+      Nothing -> Nothing
+  App (Lam var body) arg -> Just $ pure $ subst var arg body -- PURE
+  App v@(RecLam f x body) arg -> Just $ pure $ (subst x arg . subst f v) body -- PURE
+  If Tru bThen _ -> Just $ pure bThen -- PURE
+  If Fls _ bElse -> Just $ pure bElse -- PURE
+  _ -> Nothing
+
+data Res sig = Ok (Val sig) | Wr
+data Conf sig = ExpConf (Exp sig) | ResConf (Res sig)
+
+reduceStep :: (MonSem m sig) => Conf sig -> m (Conf sig)
+reduceStep c = case c of
+    ResConf _ -> pure c -- RES
+    ExpConf e ->
+        case e of
+            Ret v -> pure (ResConf (Ok v)) -- RET
+            _ -> 
+                case reduce e of
+                    Just m_e' -> ExpConf <$> m_e' -- EXP
+                    Nothing -> pure (ResConf Wr) -- WRONG
