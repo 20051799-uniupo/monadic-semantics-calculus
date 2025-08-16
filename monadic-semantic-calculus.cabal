@@ -21,8 +21,8 @@ library
       Core
       Language
       Effects.Nondeterminism
-  other-modules:
       Effects.Exceptions
+  other-modules:
       Paths_monadic_semantic_calculus
   autogen-modules:
       Paths_monadic_semantic_calculus

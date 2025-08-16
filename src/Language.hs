@@ -4,13 +4,18 @@ module Language
     Peano (..),
     subst,
     add,
-    sub
+    sub,
+    ppred
   )
 where
 
 type Identifier = String
 
 data Peano = Zero | Succ Peano deriving (Show)
+
+ppred :: Peano -> Peano
+ppred Zero = Zero
+ppred (Succ n) = n
 
 add :: Peano -> Peano -> Peano
 add Zero n = n
@@ -40,6 +45,7 @@ data Exp sig
   | And (Val sig) (Val sig)
   | Or (Val sig) (Val sig)
   | IsZero (Val sig)
+  | Pred (Val sig)
   deriving (Show)
 
 substVal :: Identifier -> Val sig -> Val sig -> Val sig
@@ -67,3 +73,4 @@ subst varName val e = case e of
   And (a) (b) -> And (substVal varName val a) (substVal varName val b)
   Or (a) (b) -> Or (substVal varName val a) (substVal varName val b)
   IsZero (n) -> IsZero (substVal varName val n)
+  Pred (n) -> Pred  (substVal varName val n)

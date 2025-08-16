@@ -6,6 +6,7 @@ module Core
     Res(..),
     Conf(..),
     reduceStep,
+    eval
   )
 where
 
@@ -38,6 +39,7 @@ reduce e = case e of
   Or (_) (_) -> Just $ pure $ Ret $ BoolVal True -- PURE
   IsZero (NumVal Zero) -> Just $ pure $ Ret $ BoolVal True -- PURE
   IsZero (NumVal _) -> Just $ pure $ Ret $ BoolVal False -- PURE
+  Pred (NumVal n) -> Just $ pure $ Ret $ NumVal $ ppred n
   _ -> Nothing
 
 data Res sig = Ok (Val sig) | Wr deriving (Show)
@@ -54,3 +56,13 @@ reduceStep c = case c of
         case reduce e of
           Just m_e' -> ExpConf <$> m_e' -- EXP
           Nothing -> pure (ResConf Wr) -- WRONG
+
+eval :: (MonSem m sig) => Conf sig -> m (Res sig)
+eval e = evalLoop $ pure e
+
+evalLoop :: (MonSem m sig) => m (Conf sig) -> m (Res sig)
+evalLoop m_conf = do
+    conf <- m_conf
+    case conf of
+        ResConf r   -> pure r
+        ExpConf _   -> evalLoop (reduceStep conf)

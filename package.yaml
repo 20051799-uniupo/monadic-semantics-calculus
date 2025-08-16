@@ -40,6 +40,7 @@ library:
     - Core
     - Language
     - Effects.Nondeterminism
+    - Effects.Exceptions
 
 executables:
   monadic-semantic-calculus-exe:
