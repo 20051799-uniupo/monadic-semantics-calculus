@@ -21,6 +21,8 @@ library
       Lib
       Effects.Nondeterminism
   other-modules:
+      Effects.Exceptions
+      Language
       Paths_monadic_semantic_calculus
   autogen-modules:
       Paths_monadic_semantic_calculus
@@ -29,6 +31,7 @@ library
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
+    , megaparsec
   default-language: Haskell2010
 
 executable monadic-semantic-calculus-exe
@@ -42,5 +45,6 @@ executable monadic-semantic-calculus-exe
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , megaparsec
     , monadic-semantic-calculus
   default-language: Haskell2010

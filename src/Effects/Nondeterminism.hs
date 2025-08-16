@@ -12,4 +12,5 @@ instance Sig NDSig where
   arity Choose = 0
 
 instance MonSem [] NDSig where
-  run Choose _ = [Bol True, Bol False]
+  run Choose [] = [BoolVal True, BoolVal False]
+  run Choose _ = undefined

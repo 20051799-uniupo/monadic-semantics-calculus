@@ -17,7 +17,24 @@ type Identifier = String
 class Sig s where
   arity :: s -> Int
 
-data Val sig = In Int | Bol Bool | Lam Identifier (Exp sig) | RecLam Identifier Identifier (Exp sig) | Vr Identifier
+data Peano = Zero | Succ Peano deriving (Show)
+
+add :: Peano -> Peano -> Peano
+add Zero n = n
+add (Succ m) n = Succ (add m n)
+
+sub :: Peano -> Peano -> Peano
+sub _ Zero = Zero
+sub Zero _ = Zero
+sub (Succ m) (Succ n) = sub m n
+
+data Val sig
+  = NumVal Peano
+  | BoolVal Bool
+  | LamVal Identifier (Exp sig)
+  | RecLamVal Identifier Identifier (Exp sig)
+  | IdentifierVal Identifier
+  deriving (Show)
 
 data Exp sig
   = App (Val sig) (Val sig)
@@ -30,6 +47,7 @@ data Exp sig
   | And (Val sig) (Val sig)
   | Or (Val sig) (Val sig)
   | IsZero (Val sig)
+  deriving (Show)
 
 class (Monad m, Sig sig) => MonSem m sig where
   run :: sig -> [Val sig] -> m (Val sig)
@@ -51,13 +69,13 @@ subst varName val e = case e of
   IsZero (n) -> IsZero (substVal varName val n)
 
 substVal :: Identifier -> Val sig -> Val sig -> Val sig
-substVal varName val (Vr x) | x == varName = val
-substVal varName val (Lam x body)
-  | x == varName = Lam x body
-  | otherwise = Lam x (subst varName val body)
-substVal varName val v@(RecLam f x body)
+substVal varName val (IdentifierVal x) | x == varName = val
+substVal varName val (LamVal x body)
+  | x == varName = LamVal x body
+  | otherwise = LamVal x (subst varName val body)
+substVal varName val v@(RecLamVal f x body)
   | f == varName || x == varName = v
-  | otherwise = RecLam f x (subst varName val body)
+  | otherwise = RecLamVal f x (subst varName val body)
 substVal _ _ v = v
 
 reduce :: (MonSem m sig) => Exp sig -> Maybe (m (Exp sig))
@@ -69,21 +87,22 @@ reduce e = case e of
     case reduce e1 of
       Just m_e1' -> Just $ (\e1' -> Do var e1' e2) <$> m_e1'
       Nothing -> Nothing
-  App (Lam var body) arg -> Just $ pure $ subst var arg body -- PURE
-  App v@(RecLam f x body) arg -> Just $ pure $ (subst x arg . subst f v) body -- PURE
-  If (Bol True) bThen _ -> Just $ pure bThen -- PURE
-  If (Bol False) _ bElse -> Just $ pure bElse -- PURE
-  Plus (In a) (In b) -> Just $ pure $ Ret $ In (a + b) -- PURE
-  Minus (In a) (In b) -> Just $ pure $ Ret $ In (a - b) -- PURE
-  And (Bol True) (Bol True) -> Just $ pure $ Ret $ Bol True -- PURE
-  And (Bol _) (Bol _) -> Just $ pure $ Ret $ Bol False -- PURE
-  Or (Bol False) (Bol False) -> Just $ pure $ Ret $ Bol False -- PURE
-  Or (_) (_) -> Just $ pure $ Ret $ Bol True -- PURE
-  IsZero (In n) | n == 0 -> Just $ pure $ Ret $ Bol True -- PURE
-  IsZero (In _) -> Just $ pure $ Ret $ Bol False -- PURE
+  App (LamVal var body) arg -> Just $ pure $ subst var arg body -- PURE
+  App v@(RecLamVal f x body) arg -> Just $ pure $ (subst x arg . subst f v) body -- PURE
+  If (BoolVal True) bThen _ -> Just $ pure bThen -- PURE
+  If (BoolVal False) _ bElse -> Just $ pure bElse -- PURE
+  Plus (NumVal a) (NumVal b) -> Just $ pure $ Ret $ NumVal $ add a b -- PURE
+  Minus (NumVal a) (NumVal b) -> Just $ pure $ Ret $ NumVal $ sub a b -- PURE
+  And (BoolVal True) (BoolVal True) -> Just $ pure $ Ret $ BoolVal True -- PURE
+  And (BoolVal _) (BoolVal _) -> Just $ pure $ Ret $ BoolVal False -- PURE
+  Or (BoolVal False) (BoolVal False) -> Just $ pure $ Ret $ BoolVal False -- PURE
+  Or (_) (_) -> Just $ pure $ Ret $ BoolVal True -- PURE
+  IsZero (NumVal Zero) -> Just $ pure $ Ret $ BoolVal True -- PURE
+  IsZero (NumVal _) -> Just $ pure $ Ret $ BoolVal False -- PURE
   _ -> Nothing
 
 data Res sig = Ok (Val sig) | Wr
+
 data Conf sig = ExpConf (Exp sig) | ResConf (Res sig)
 
 reduceStep :: (MonSem m sig) => Conf sig -> m (Conf sig)
