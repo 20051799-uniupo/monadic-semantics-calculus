@@ -1,2 +1,9 @@
+import Core
+import Language
+import Effects.Nondeterminism
+
 main :: IO ()
-main = putStrLn "Test suite not yet implemented"
+main = do
+    let e = ExpConf (Magic Choose [])
+    let r = reduceStep e :: [Conf NDSig]
+    putStrLn $ show r

@@ -1,12 +1,14 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
-module Effects.Nondeterminism (
-    NDSig(..)
-) where
+module Effects.Nondeterminism
+  ( NDSig (..),
+  )
+where
 
-import Lib
+import Core
+import Language
 
-data NDSig = Choose
+data NDSig = Choose deriving (Show)
 
 instance Sig NDSig where
   arity Choose = 0

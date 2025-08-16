@@ -37,7 +37,8 @@ ghc-options:
 library:
   source-dirs: src
   exposed-modules:
-    - Lib
+    - Core
+    - Language
     - Effects.Nondeterminism
 
 executables:
@@ -51,13 +52,13 @@ executables:
     dependencies:
     - monadic-semantic-calculus
 
-# tests:
-#   monadic-semantic-calculus-test:
-#     main:                Spec.hs
-#     source-dirs:         test
-#     ghc-options:
-#     - -threaded
-#     - -rtsopts
-#     - -with-rtsopts=-N
-#     dependencies:
-#     - monadic-semantic-calculus
+tests:
+  monadic-semantic-calculus-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - monadic-semantic-calculus
