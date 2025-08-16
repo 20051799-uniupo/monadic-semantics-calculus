@@ -5,7 +5,6 @@ module Effects.Nondeterminism
   )
 where
 
-import Core
 import Language
 
 data NDSig = Choose deriving (Show)

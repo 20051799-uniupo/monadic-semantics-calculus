@@ -5,7 +5,7 @@ module Effects.Exceptions
   )
 where
 
-import Core
+import Language
 
 data ExceptionSig e = Raise e deriving (Show)
 

@@ -1,46 +1,14 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Core
-  ( Sig (..),
-    MonSem (..),
-    Res(..),
-    Conf(..),
+  ( Res (..),
+    Conf (..),
     reduceStep,
-    eval
+    eval,
   )
 where
 
 import Language
-
-class Sig s where
-  arity :: s -> Int
-
-class (Monad m, Sig sig) => MonSem m sig where
-  run :: sig -> [Val sig] -> m (Val sig)
-
-reduce :: (MonSem m sig) => Exp sig -> Maybe (m (Exp sig))
-reduce e = case e of
-  Magic op vs -> Just $ Ret <$> run op vs -- EFFECT
-  Do var (Ret val) e2 -> Just $ pure $ subst var val e2 -- RET
-  Do var e1 e2 ->
-    -- DO
-    case reduce e1 of
-      Just m_e1' -> Just $ (\e1' -> Do var e1' e2) <$> m_e1'
-      Nothing -> Nothing
-  App (LamVal var body) arg -> Just $ pure $ subst var arg body -- PURE
-  App v@(RecLamVal f x body) arg -> Just $ pure $ (subst x arg . subst f v) body -- PURE
-  If (BoolVal True) bThen _ -> Just $ pure bThen -- PURE
-  If (BoolVal False) _ bElse -> Just $ pure bElse -- PURE
-  Plus (NumVal a) (NumVal b) -> Just $ pure $ Ret $ NumVal $ add a b -- PURE
-  Minus (NumVal a) (NumVal b) -> Just $ pure $ Ret $ NumVal $ sub a b -- PURE
-  And (BoolVal True) (BoolVal True) -> Just $ pure $ Ret $ BoolVal True -- PURE
-  And (BoolVal _) (BoolVal _) -> Just $ pure $ Ret $ BoolVal False -- PURE
-  Or (BoolVal False) (BoolVal False) -> Just $ pure $ Ret $ BoolVal False -- PURE
-  Or (_) (_) -> Just $ pure $ Ret $ BoolVal True -- PURE
-  IsZero (NumVal Zero) -> Just $ pure $ Ret $ BoolVal True -- PURE
-  IsZero (NumVal _) -> Just $ pure $ Ret $ BoolVal False -- PURE
-  Pred (NumVal n) -> Just $ pure $ Ret $ NumVal $ ppred n
-  _ -> Nothing
 
 data Res sig = Ok (Val sig) | Wr deriving (Show)
 
@@ -62,7 +30,7 @@ eval e = evalLoop $ pure e
 
 evalLoop :: (MonSem m sig) => m (Conf sig) -> m (Res sig)
 evalLoop m_conf = do
-    conf <- m_conf
-    case conf of
-        ResConf r   -> pure r
-        ExpConf _   -> evalLoop (reduceStep conf)
+  conf <- m_conf
+  case conf of
+    ResConf r -> pure r
+    ExpConf _ -> evalLoop (reduceStep conf)

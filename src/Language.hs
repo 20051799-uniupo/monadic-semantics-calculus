@@ -1,11 +1,16 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+
 module Language
   ( Val (..),
     Exp (..),
     Peano (..),
+    MonSem (..),
+    Sig (..),
     subst,
+    reduce,
     add,
     sub,
-    ppred
+    ppred,
   )
 where
 
@@ -45,6 +50,7 @@ data Exp sig
   | And (Val sig) (Val sig)
   | Or (Val sig) (Val sig)
   | IsZero (Val sig)
+  | Suc (Val sig)
   | Pred (Val sig)
   deriving (Show)
 
@@ -73,4 +79,36 @@ subst varName val e = case e of
   And (a) (b) -> And (substVal varName val a) (substVal varName val b)
   Or (a) (b) -> Or (substVal varName val a) (substVal varName val b)
   IsZero (n) -> IsZero (substVal varName val n)
-  Pred (n) -> Pred  (substVal varName val n)
+  Suc (n) -> Suc (substVal varName val n)
+  Pred (n) -> Pred (substVal varName val n)
+
+class Sig s where
+  arity :: s -> Int
+
+class (Monad m, Sig sig) => MonSem m sig where
+  run :: sig -> [Val sig] -> m (Val sig)
+
+reduce :: (MonSem m sig) => Exp sig -> Maybe (m (Exp sig))
+reduce e = case e of
+  Magic op vs -> Just $ Ret <$> run op vs -- EFFECT
+  Do var (Ret val) e2 -> Just $ pure $ subst var val e2 -- RET
+  Do var e1 e2 ->
+    -- DO
+    case reduce e1 of
+      Just m_e1' -> Just $ (\e1' -> Do var e1' e2) <$> m_e1'
+      Nothing -> Nothing
+  App (LamVal var body) arg -> Just $ pure $ subst var arg body -- PURE
+  App v@(RecLamVal f x body) arg -> Just $ pure $ (subst x arg  . subst f v) body -- PURE
+  If (BoolVal True) bThen _ -> Just $ pure bThen -- PURE
+  If (BoolVal False) _ bElse -> Just $ pure bElse -- PURE
+  Plus (NumVal a) (NumVal b) -> Just $ pure $ Ret $ NumVal $ add a b -- PURE
+  Minus (NumVal a) (NumVal b) -> Just $ pure $ Ret $ NumVal $ sub a b -- PURE
+  And (BoolVal True) (BoolVal True) -> Just $ pure $ Ret $ BoolVal True -- PURE
+  And (BoolVal _) (BoolVal _) -> Just $ pure $ Ret $ BoolVal False -- PURE
+  Or (BoolVal False) (BoolVal False) -> Just $ pure $ Ret $ BoolVal False -- PURE
+  Or (_) (_) -> Just $ pure $ Ret $ BoolVal True -- PURE
+  IsZero (NumVal Zero) -> Just $ pure $ Ret $ BoolVal True -- PURE
+  IsZero (NumVal _) -> Just $ pure $ Ret $ BoolVal False -- PURE
+  Suc (NumVal n) -> Just $ pure $ Ret $ NumVal $ Succ n
+  Pred (NumVal n) -> Just $ pure $ Ret $ NumVal $ ppred n
+  _ -> Nothing
