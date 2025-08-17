@@ -103,10 +103,8 @@ reduce e = case e of
   If (BoolVal False) _ bElse -> Just $ pure bElse -- PURE
   Plus (NumVal a) (NumVal b) -> Just $ pure $ Ret $ NumVal $ add a b -- PURE
   Minus (NumVal a) (NumVal b) -> Just $ pure $ Ret $ NumVal $ sub a b -- PURE
-  And (BoolVal True) (BoolVal True) -> Just $ pure $ Ret $ BoolVal True -- PURE
-  And (BoolVal _) (BoolVal _) -> Just $ pure $ Ret $ BoolVal False -- PURE
-  Or (BoolVal False) (BoolVal False) -> Just $ pure $ Ret $ BoolVal False -- PURE
-  Or (_) (_) -> Just $ pure $ Ret $ BoolVal True -- PURE
+  And (BoolVal a) (BoolVal b) -> Just $ pure $ Ret $ BoolVal $ a && b -- PURE
+  Or (BoolVal a) (BoolVal b) -> Just $ pure $ Ret $ BoolVal $ a || b -- PURE
   IsZero (NumVal Zero) -> Just $ pure $ Ret $ BoolVal True -- PURE
   IsZero (NumVal _) -> Just $ pure $ Ret $ BoolVal False -- PURE
   Suc (NumVal n) -> Just $ pure $ Ret $ NumVal $ Succ n
