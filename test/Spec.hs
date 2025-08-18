@@ -1,8 +1,8 @@
 import Core
+import Data.Map (fromList)
 import Effects.Exceptions
 import Effects.Nondeterminism
 import Language
-import Data.Map (fromList)
 
 main :: IO ()
 main = do
@@ -125,33 +125,79 @@ main = do
             ++ " =>\n"
             ++ show m_e4'''''''''''
 
-    putStrLn "--- Example 46 ---"
+    putStrLn "--- Example 46.1 ---"
     let h =
             Handler
                 { handlerClauses =
-                    fromList [ (Raise "PredZero", Clause
-                        { clauseMode = Stop
-                        , clauseParams = []
-                        , clauseBody = Ret $ NumVal Zero
-                        })
-                    ]
+                    fromList
+                        [
+                            ( Raise "PredZero"
+                            , Clause
+                                { clauseMode = Stop
+                                , clauseParams = []
+                                , clauseBody = Ret $ NumVal Zero
+                                }
+                            )
+                        ]
                 , handlerFinal = ("x", Ret $ IdentifierVal "x")
                 }
 
     let e5 = ExpConf $ HandleWith (predFun $ NumVal Zero) h
-    putStrLn $ show e5 ++ " =>* " ++ show (eval e5 ::(Either String (Res (ExceptionSig String))))
+    putStrLn $ show e5 ++ " =>* " ++ show (eval e5 :: (Either String (Res (ExceptionSig String))))
 
     let h' =
             Handler
                 { handlerClauses =
-                    fromList [ (Raise "NotPredZero", Clause
-                        { clauseMode = Stop
-                        , clauseParams = []
-                        , clauseBody = Ret $ NumVal Zero
-                        })
-                    ]
+                    fromList
+                        [
+                            ( Raise "NotPredZero"
+                            , Clause
+                                { clauseMode = Stop
+                                , clauseParams = []
+                                , clauseBody = Ret $ NumVal Zero
+                                }
+                            )
+                        ]
                 , handlerFinal = ("x", Ret $ IdentifierVal "x")
                 }
 
     let e6 = ExpConf $ HandleWith (predFun $ NumVal Zero) h'
-    putStrLn $ show e6 ++ " =>* " ++ show (eval e6 ::(Either String (Res (ExceptionSig String))))
+    putStrLn $ show e6 ++ " =>* " ++ show (eval e6 :: (Either String (Res (ExceptionSig String))))
+
+    putStrLn "--- Example handler with 'continue' ---"
+    let h1 =
+            Handler
+                { handlerClauses =
+                    fromList
+                        [
+                            ( Choose
+                            , Clause
+                                { clauseMode = Continue
+                                , clauseParams = []
+                                , clauseBody = Ret (BoolVal True)
+                                }
+                            )
+                        ]
+                , handlerFinal = ("x", Ret $ IdentifierVal "x")
+                }
+    let ndExp = Do "y" (Magic Choose []) (If (IdentifierVal "y") (Ret $ NumVal Zero) (Ret $ NumVal $ Succ Zero))
+    let e7 = ExpConf $ HandleWith ndExp h1
+    putStrLn $ show e7 ++ " =>* " ++ show (eval e7 :: [Res NDSig])
+
+    let h2 =
+            Handler
+                { handlerClauses =
+                    fromList
+                        [
+                            ( Choose
+                            , Clause
+                                { clauseMode = Continue
+                                , clauseParams = []
+                                , clauseBody = Ret (BoolVal False)
+                                }
+                            )
+                        ]
+                , handlerFinal = ("x", Ret $ IdentifierVal "x")
+                }
+    let e8 = ExpConf $ HandleWith ndExp h2
+    putStrLn $ show e8 ++ " =>* " ++ show (eval e8 :: [Res NDSig])
