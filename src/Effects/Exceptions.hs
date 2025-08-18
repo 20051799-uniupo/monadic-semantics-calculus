@@ -7,7 +7,7 @@ where
 
 import Language
 
-data ExceptionSig e = Raise e deriving (Show)
+data ExceptionSig e = Raise e deriving (Show, Eq, Ord)
 
 instance Sig (ExceptionSig e) where
   arity (Raise _) = 0

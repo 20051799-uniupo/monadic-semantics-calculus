@@ -14,7 +14,7 @@ data Res sig = Ok (Val sig) | Wr deriving (Show)
 
 data Conf sig = ExpConf (Exp sig) | ResConf (Res sig) deriving (Show)
 
-reduceStep :: (MonSem m sig) => Conf sig -> m (Conf sig)
+reduceStep :: (MonSem m sig, Ord sig) => Conf sig -> m (Conf sig)
 reduceStep c = case c of
   ResConf _ -> pure c -- RES
   ExpConf e ->
@@ -25,10 +25,10 @@ reduceStep c = case c of
           Just m_e' -> ExpConf <$> m_e' -- EXP
           Nothing -> pure (ResConf Wr) -- WRONG
 
-eval :: (MonSem m sig) => Conf sig -> m (Res sig)
+eval :: (MonSem m sig, Ord sig) => Conf sig -> m (Res sig)
 eval e = evalLoop $ pure e
 
-evalLoop :: (MonSem m sig) => m (Conf sig) -> m (Res sig)
+evalLoop :: (MonSem m sig, Ord sig) => m (Conf sig) -> m (Res sig)
 evalLoop m_conf = do
   conf <- m_conf
   case conf of

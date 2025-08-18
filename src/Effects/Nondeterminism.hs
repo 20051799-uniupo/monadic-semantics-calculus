@@ -7,7 +7,7 @@ where
 
 import Language
 
-data NDSig = Choose deriving (Show)
+data NDSig = Choose deriving (Show, Eq, Ord)
 
 instance Sig NDSig where
   arity Choose = 0
