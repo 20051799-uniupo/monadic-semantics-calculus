@@ -164,7 +164,9 @@ main = do
     let e6 = ExpConf $ HandleWith (predFun $ NumVal Zero) h'
     putStrLn $ show e6 ++ " =>* " ++ show (eval e6 :: (Either String (Res (ExceptionSig String))))
 
-    putStrLn "--- Example handler with 'continue' ---"
+    putStrLn "--- Example handlers with 'continue' ---"
+    let ndExp = Do "y" (Magic Choose []) (If (IdentifierVal "y") (Ret $ NumVal Zero) (Ret $ NumVal $ Succ Zero))
+
     let h1 =
             Handler
                 { handlerClauses =
@@ -180,7 +182,6 @@ main = do
                         ]
                 , handlerFinal = ("x", Ret $ IdentifierVal "x")
                 }
-    let ndExp = Do "y" (Magic Choose []) (If (IdentifierVal "y") (Ret $ NumVal Zero) (Ret $ NumVal $ Succ Zero))
     let e7 = ExpConf $ HandleWith ndExp h1
     putStrLn $ show e7 ++ " =>* " ++ show (eval e7 :: [Res NDSig])
 
