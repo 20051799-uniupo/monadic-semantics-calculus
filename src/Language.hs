@@ -6,6 +6,9 @@ module Language (
     Peano (..),
     MonSem (..),
     Sig (..),
+    Handler (..),
+    Clause (..),
+    Mode (..),
     subst,
     reduce,
     add,
@@ -130,41 +133,39 @@ class (Monad m, Sig sig) => MonSem m sig where
 
 reducePure :: (Ord sig) => Exp sig -> Maybe (Exp sig)
 reducePure e = case e of
-  App (LamVal var body) arg -> Just $ subst var arg body
-  App v@(RecLamVal f x body) arg -> Just $ (subst f v . subst x arg) body
-
-  If (BoolVal True) bThen _ -> Just bThen
-  If (BoolVal False) _ bElse -> Just bElse
-  Plus (NumVal a) (NumVal b) -> Just $ Ret $ NumVal $ add a b
-  Minus (NumVal a) (NumVal b) -> Just $ Ret $ NumVal $ sub a b
-  And (BoolVal a) (BoolVal b) -> Just $ Ret $ BoolVal (a && b)
-  Or (BoolVal a) (BoolVal b) -> Just $ Ret $ BoolVal (a || b)
-  IsZero (NumVal Zero) -> Just $ Ret $ BoolVal True
-  IsZero (NumVal _) -> Just $ Ret $ BoolVal False
-  Suc (NumVal n) -> Just $ Ret $ NumVal $ Succ n
-  Pred (NumVal n) -> Just $ Ret $ NumVal $ ppred n
-
-  HandleWith (Do y e1 e2) h -> Just $ HandleWith e1 (h {handlerFinal = (y, HandleWith e2 h)})
-  HandleWith (Ret v) (Handler _ (x, e')) -> Just $ Do x (Ret v) e'
-  HandleWith (Magic op vs) (Handler cs (finalVar, finalBody)) ->
-    case Map.lookup op cs of
-      Just (Clause Continue params body) -> Just $ Do finalVar (substs (zip params vs) body) finalBody
-      Just (Clause Stop params body) -> Just $ substs (zip params vs) body
-      Nothing -> Just $ Do finalVar (Magic op vs) finalBody
-  HandleWith e1 h -> HandleWith <$> reducePure e1 <*> pure h
-
-  _ -> Nothing
+    App (LamVal var body) arg -> Just $ subst var arg body
+    App v@(RecLamVal f x body) arg -> Just $ (subst f v . subst x arg) body
+    If (BoolVal True) bThen _ -> Just bThen
+    If (BoolVal False) _ bElse -> Just bElse
+    Plus (NumVal a) (NumVal b) -> Just $ Ret $ NumVal $ add a b
+    Minus (NumVal a) (NumVal b) -> Just $ Ret $ NumVal $ sub a b
+    And (BoolVal a) (BoolVal b) -> Just $ Ret $ BoolVal (a && b)
+    Or (BoolVal a) (BoolVal b) -> Just $ Ret $ BoolVal (a || b)
+    IsZero (NumVal Zero) -> Just $ Ret $ BoolVal True
+    IsZero (NumVal _) -> Just $ Ret $ BoolVal False
+    Suc (NumVal n) -> Just $ Ret $ NumVal $ Succ n
+    Pred (NumVal n) -> Just $ Ret $ NumVal $ ppred n
+    HandleWith (Do y e1 e2) h -> Just $ HandleWith e1 (h{handlerFinal = (y, HandleWith e2 h)})
+    HandleWith (Ret v) (Handler _ (x, e')) -> Just $ Do x (Ret v) e'
+    HandleWith (Magic op vs) (Handler cs (finalVar, finalBody)) ->
+        case Map.lookup op cs of
+            Just (Clause Continue params body) -> Just $ Do finalVar (substs (zip params vs) body) finalBody
+            Just (Clause Stop params body) -> Just $ substs (zip params vs) body
+            Nothing -> Just $ Do finalVar (Magic op vs) finalBody
+    HandleWith e1 h -> HandleWith <$> reducePure e1 <*> pure h
+    _ -> Nothing
 
 reduce :: (MonSem m sig, Ord sig) => Exp sig -> Maybe (m (Exp sig))
 reduce e =
-  case reducePure e of
-    Just e' -> Just (pure e')
-    Nothing ->
-      case e of
-        Magic op vs -> Just $ Ret <$> run op vs -- EFFECT
-        Do var (Ret val) e2 -> Just $ pure $ subst var val e2 -- RET
-        Do var e1 e2 -> -- DO
-          case reduce e1 of
-            Just m_e1' -> Just $ (\e1' -> Do var e1' e2) <$> m_e1'
-            Nothing -> Nothing
-        _ -> Nothing
+    case reducePure e of
+        Just e' -> Just (pure e')
+        Nothing ->
+            case e of
+                Magic op vs -> Just $ Ret <$> run op vs -- EFFECT
+                Do var (Ret val) e2 -> Just $ pure $ subst var val e2 -- RET
+                Do var e1 e2 ->
+                    -- DO
+                    case reduce e1 of
+                        Just m_e1' -> Just $ (\e1' -> Do var e1' e2) <$> m_e1'
+                        Nothing -> Nothing
+                _ -> Nothing
