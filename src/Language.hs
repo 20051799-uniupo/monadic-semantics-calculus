@@ -19,6 +19,7 @@ where
 
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.List (intercalate)
 
 type Identifier = String
 
@@ -43,22 +44,41 @@ data Val sig
     | LamVal Identifier (Exp sig)
     | RecLamVal Identifier Identifier (Exp sig)
     | IdentifierVal Identifier
-    deriving (Show)
 
-data Mode = Continue | Stop deriving (Show)
+instance (Show sig) => Show (Val sig) where
+    show v = case v of
+        NumVal n -> show n
+        BoolVal b -> show b
+        LamVal x e -> "λ" ++ x ++ "." ++ show e
+        RecLamVal f x e -> "rec " ++ f ++ ".λ" ++ x ++ "." ++ show e
+        IdentifierVal x -> x
+
+data Mode = Continue | Stop
 
 data Clause sig = Clause
     { clauseMode :: Mode
     , clauseParams :: [Identifier]
     , clauseBody :: Exp sig
     }
-    deriving (Show)
 
 data Handler sig = Handler
     { handlerClauses :: Map sig (Clause sig)
     , handlerFinal :: (Identifier, Exp sig)
     }
-    deriving (Show)
+
+instance (Show sig) => Show (Handler sig) where
+    show (Handler cs (x, e)) =
+        "(("
+        ++ intercalate ", " [showClause op c | (op, c) <- Map.toList cs]
+        ++ "), "
+        ++ x ++ "->" ++ show e
+        ++ ")"
+      where
+        showClause op (Clause m p b) =
+            show op ++ show p ++ "(->" ++ arrowMode m ++ ")" ++ show b
+
+        arrowMode Continue = "c"
+        arrowMode Stop     = "s"
 
 substHandler :: Identifier -> Val sig -> Handler sig -> Handler sig
 substHandler varName val (Handler clauses (finalVar, finalBody)) =
@@ -91,7 +111,26 @@ data Exp sig
     | IsZero (Val sig)
     | Suc (Val sig)
     | Pred (Val sig)
-    deriving (Show)
+
+instance (Show sig) => Show (Exp sig) where
+    show e =
+        "("
+            ++ ( case e of
+                    App v1 v2 -> show v1 ++ " " ++ show v2
+                    Ret v -> "return " ++ show v
+                    Do x e1 e2 -> "do " ++ show x ++ " = " ++ show e1 ++ "; " ++ show e2
+                    Magic s vs -> show s ++ "(" ++ show vs ++ ")"
+                    HandleWith e1 h -> "handle " ++ show e1 ++ " with " ++ show h
+                    If p bThen bElse -> "if " ++ "(" ++ show p ++ ") then " ++ show bThen ++ " else " ++ show bElse
+                    Plus (a) (b) -> show a ++ " + " ++ show b
+                    Minus (a) (b) -> show a ++ " - " ++ show b
+                    And (a) (b) -> show a ++ " && " ++ show b
+                    Or (a) (b) -> show a ++ " || " ++ show b
+                    IsZero (n) -> "iszero " ++ show n
+                    Suc (n) -> "succ " ++ show n
+                    Pred (n) -> "pred " ++ show n
+               )
+            ++ ")"
 
 substVal :: Identifier -> Val sig -> Val sig -> Val sig
 substVal varName val (IdentifierVal x) | x == varName = val

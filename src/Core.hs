@@ -12,11 +12,7 @@ import Language
 
 data Res sig = Ok (Val sig) | Wr deriving (Show)
 
-data Conf sig = ExpConf (Exp sig) | ResConf (Res sig)
-
-instance Show sig => Show (Conf sig) where
-    show (ExpConf e) = show e
-    show (ResConf r) = show r
+data Conf sig = ExpConf (Exp sig) | ResConf (Res sig) deriving (Show)
 
 reduceStep :: (MonSem m sig, Ord sig) => Conf sig -> m (Conf sig)
 reduceStep c = case c of
