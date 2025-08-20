@@ -8,10 +8,10 @@ main :: IO ()
 main = do
     putStrLn "--- Example 18 ---"
     let predFun = \x -> Do "p" (IsZero x) (If (IdentifierVal "p") (Magic (Raise "PredZero") []) (Pred $ x))
-    let e1 = ExpConf $ predFun $ NumVal $ Succ Zero
+    let e1 = predFun $ NumVal $ Succ Zero
     putStrLn "- predfun succ 0:"
-    putStrLn $ show e1 ++ " =>* " ++ show (eval e1 :: (Either String (Res (ExceptionSig String))))
-    let m_e1 = reduceStep e1 :: (Either String (Conf (ExceptionSig String)))
+    putStrLn $ show e1 ++ " =>* " ++ show (evalFin e1 :: (Either String (Res (ExceptionSig String))))
+    let m_e1 = reduceStep (ExpConf e1) :: (Either String (Conf (ExceptionSig String)))
     let m_e1' = m_e1 >>= reduceStep
     let m_e1'' = m_e1' >>= reduceStep
     let m_1''' = m_e1'' >>= reduceStep
@@ -29,10 +29,10 @@ main = do
             ++ " =>\n"
             ++ show m_e1''''
 
-    let e2 = ExpConf $ predFun $ NumVal Zero
+    let e2 = predFun $ NumVal Zero
     putStrLn "- predfun 0:"
-    putStrLn $ show e2 ++ " =>* " ++ show (eval e2 :: (Either String (Res (ExceptionSig String))))
-    let m_e2 = reduceStep e2 :: (Either String (Conf (ExceptionSig String)))
+    putStrLn $ show e2 ++ " =>* " ++ show (evalFin e2 :: (Either String (Res (ExceptionSig String))))
+    let m_e2 = reduceStep (ExpConf e2) :: (Either String (Conf (ExceptionSig String)))
     let m_e2' = m_e2 >>= reduceStep
     let m_e2'' = m_e2' >>= reduceStep
     let m_e2''' = m_e2'' >>= reduceStep
@@ -49,9 +49,9 @@ main = do
 
     putStrLn "--- Example 19 ---"
     putStrLn "- e:"
-    let e3 = ExpConf $ Do "y" (Magic Choose []) (If (IdentifierVal "y") (Ret $ NumVal Zero) (Ret $ NumVal $ Succ Zero))
-    putStrLn $ show e3 ++ " =>* " ++ show (eval e3 :: [Res NDSig])
-    let m_e3 = reduceStep e3 :: [Conf NDSig]
+    let e3 = Do "y" (Magic Choose []) (If (IdentifierVal "y") (Ret $ NumVal Zero) (Ret $ NumVal $ Succ Zero))
+    putStrLn $ show e3 ++ " =>* " ++ show (evalFin e3 :: [Res NDSig])
+    let m_e3 = reduceStep (ExpConf e3) :: [Conf NDSig]
     let m_e3' = m_e3 >>= reduceStep
     let m_e3'' = m_e3' >>= reduceStep
     let m_e3''' = m_e3'' >>= reduceStep
@@ -142,8 +142,8 @@ main = do
                 , handlerFinal = ("x", Ret $ IdentifierVal "x")
                 }
 
-    let e5 = ExpConf $ HandleWith (predFun $ NumVal Zero) h
-    putStrLn $ show e5 ++ " =>* " ++ show (eval e5 :: (Either String (Res (ExceptionSig String))))
+    let e5 = HandleWith (predFun $ NumVal Zero) h
+    putStrLn $ show e5 ++ " =>* " ++ show (evalFin e5 :: (Either String (Res (ExceptionSig String))))
 
     let h' =
             Handler
@@ -161,8 +161,8 @@ main = do
                 , handlerFinal = ("x", Ret $ IdentifierVal "x")
                 }
 
-    let e6 = ExpConf $ HandleWith (predFun $ NumVal Zero) h'
-    putStrLn $ show e6 ++ " =>* " ++ show (eval e6 :: (Either String (Res (ExceptionSig String))))
+    let e6 = HandleWith (predFun $ NumVal Zero) h'
+    putStrLn $ show e6 ++ " =>* " ++ show (evalFin e6 :: (Either String (Res (ExceptionSig String))))
 
     putStrLn "--- Example handlers with 'continue' ---"
     let ndExp = Do "y" (Magic Choose []) (If (IdentifierVal "y") (Ret $ NumVal Zero) (Ret $ NumVal $ Succ Zero))
@@ -182,8 +182,8 @@ main = do
                         ]
                 , handlerFinal = ("x", Ret $ IdentifierVal "x")
                 }
-    let e7 = ExpConf $ HandleWith ndExp h1
-    putStrLn $ show e7 ++ " =>* " ++ show (eval e7 :: [Res NDSig])
+    let e7 = HandleWith ndExp h1
+    putStrLn $ show e7 ++ " =>* " ++ show (evalFin e7 :: [Res NDSig])
 
     let h2 =
             Handler
@@ -200,5 +200,5 @@ main = do
                         ]
                 , handlerFinal = ("x", Ret $ IdentifierVal "x")
                 }
-    let e8 = ExpConf $ HandleWith ndExp h2
-    putStrLn $ show e8 ++ " =>* " ++ show (eval e8 :: [Res NDSig])
+    let e8 = HandleWith ndExp h2
+    putStrLn $ show e8 ++ " =>* " ++ show (evalFin e8 :: [Res NDSig])

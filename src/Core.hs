@@ -4,7 +4,8 @@ module Core
   ( Res (..),
     Conf (..),
     reduceStep,
-    eval,
+    reduceMnStep,
+    evalFin,
   )
 where
 
@@ -12,11 +13,7 @@ import Language
 
 data Res sig = Ok (Val sig) | Wr deriving (Show)
 
-data Conf sig = ExpConf (Exp sig) | ResConf (Res sig)
-
-instance Show sig => Show (Conf sig) where
-    show (ExpConf e) = show e
-    show (ResConf r) = show r
+data Conf sig = ExpConf (Exp sig) | ResConf (Res sig) deriving (Show)
 
 reduceStep :: (MonSem m sig, Ord sig) => Conf sig -> m (Conf sig)
 reduceStep c = case c of
@@ -29,8 +26,11 @@ reduceStep c = case c of
           Just m_e' -> ExpConf <$> m_e' -- EXP
           Nothing -> pure (ResConf Wr) -- WRONG
 
-eval :: (MonSem m sig, Ord sig) => Conf sig -> m (Res sig)
-eval e = evalLoop $ pure e
+reduceMnStep :: (MonSem m sig, Ord sig) => m (Conf sig) -> m (Conf sig)
+reduceMnStep c = c >>= reduceStep
+
+evalFin :: (MonSem m sig, Ord sig) => Exp sig -> m (Res sig)
+evalFin e = evalLoop $ pure $ ExpConf e
 
 evalLoop :: (MonSem m sig, Ord sig) => m (Conf sig) -> m (Res sig)
 evalLoop m_conf = do
