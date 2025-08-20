@@ -4,7 +4,8 @@ module Core
   ( Res (..),
     Conf (..),
     reduceStep,
-    eval,
+    reduceMnStep,
+    evalFin,
   )
 where
 
@@ -25,8 +26,11 @@ reduceStep c = case c of
           Just m_e' -> ExpConf <$> m_e' -- EXP
           Nothing -> pure (ResConf Wr) -- WRONG
 
-eval :: (MonSem m sig, Ord sig) => Conf sig -> m (Res sig)
-eval e = evalLoop $ pure e
+reduceMnStep :: (MonSem m sig, Ord sig) => m (Conf sig) -> m (Conf sig)
+reduceMnStep c = c >>= reduceStep
+
+evalFin :: (MonSem m sig, Ord sig) => Exp sig -> m (Res sig)
+evalFin e = evalLoop $ pure $ ExpConf e
 
 evalLoop :: (MonSem m sig, Ord sig) => m (Conf sig) -> m (Res sig)
 evalLoop m_conf = do
