@@ -3,12 +3,13 @@ import Data.Map (fromList)
 import Effects.Exceptions
 import Effects.Nondeterminism
 import Language
+import Nat (Nat(..), Peano)
 
 main :: IO ()
 main = do
     putStrLn "--- Example 18 ---"
     let predFun = \x -> Do "p" (IsZero x) (If (IdentifierVal "p") (Magic (Raise "PredZero") []) (Pred $ x))
-    let e1 = predFun $ NumVal $ Succ Zero
+    let e1 = predFun $ NumVal $ succ (zero :: Peano)
     putStrLn "- predfun succ 0:"
     putStrLn $ show e1 ++ " =>* " ++ show (evalFin e1 :: (Either String (Res (ExceptionSig String))))
     let m_e1 = reduceStep (ExpConf e1) :: (Either String (Conf (ExceptionSig String)))
@@ -29,7 +30,7 @@ main = do
             ++ " =>\n"
             ++ show m_e1''''
 
-    let e2 = predFun $ NumVal Zero
+    let e2 = predFun $ NumVal (zero :: Peano)
     putStrLn "- predfun 0:"
     putStrLn $ show e2 ++ " =>* " ++ show (evalFin e2 :: (Either String (Res (ExceptionSig String))))
     let m_e2 = reduceStep (ExpConf e2) :: (Either String (Conf (ExceptionSig String)))
@@ -49,7 +50,7 @@ main = do
 
     putStrLn "--- Example 19 ---"
     putStrLn "- e:"
-    let e3 = Do "y" (Magic Choose []) (If (IdentifierVal "y") (Ret $ NumVal Zero) (Ret $ NumVal $ Succ Zero))
+    let e3 = Do "y" (Magic Choose []) (If (IdentifierVal "y") (Ret $ NumVal (zero :: Peano)) (Ret $ NumVal $ succ (zero :: Peano)))
     putStrLn $ show e3 ++ " =>* " ++ show (evalFin e3 :: [Res NDSig])
     let m_e3 = reduceStep (ExpConf e3) :: [Conf NDSig]
     let m_e3' = m_e3 >>= reduceStep
@@ -84,7 +85,7 @@ main = do
                         )
                     )
                 )
-    let e4 = ExpConf $ App chfun (NumVal Zero)
+    let e4 = ExpConf $ App chfun (NumVal (zero :: Peano))
     let m_e4 = reduceStep e4 :: [Conf NDSig]
     let m_e4' = m_e4 >>= reduceStep
     let m_e4'' = m_e4' >>= reduceStep
@@ -135,14 +136,14 @@ main = do
                             , Clause
                                 { clauseMode = Stop
                                 , clauseParams = []
-                                , clauseBody = Ret $ NumVal Zero
+                                , clauseBody = Ret $ NumVal (zero :: Peano)
                                 }
                             )
                         ]
                 , handlerFinal = ("x", Ret $ IdentifierVal "x")
                 }
 
-    let e5 = HandleWith (predFun $ NumVal Zero) h
+    let e5 = HandleWith (predFun $ NumVal (zero :: Peano)) h
     putStrLn $ show e5 ++ " =>* " ++ show (evalFin e5 :: (Either String (Res (ExceptionSig String))))
 
     let h' =
@@ -154,18 +155,18 @@ main = do
                             , Clause
                                 { clauseMode = Stop
                                 , clauseParams = []
-                                , clauseBody = Ret $ NumVal Zero
+                                , clauseBody = Ret $ NumVal (zero :: Peano)
                                 }
                             )
                         ]
                 , handlerFinal = ("x", Ret $ IdentifierVal "x")
                 }
 
-    let e6 = HandleWith (predFun $ NumVal Zero) h'
+    let e6 = HandleWith (predFun $ NumVal (zero :: Peano)) h'
     putStrLn $ show e6 ++ " =>* " ++ show (evalFin e6 :: (Either String (Res (ExceptionSig String))))
 
     putStrLn "--- Example handlers with 'continue' ---"
-    let ndExp = Do "y" (Magic Choose []) (If (IdentifierVal "y") (Ret $ NumVal Zero) (Ret $ NumVal $ Succ Zero))
+    let ndExp = Do "y" (Magic Choose []) (If (IdentifierVal "y") (Ret $ NumVal (zero :: Peano)) (Ret $ NumVal $ succ (zero :: Peano)))
 
     let h1 =
             Handler

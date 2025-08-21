@@ -1,9 +1,9 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE GADTs #-}
 
 module Language (
     Val (..),
     Exp (..),
-    Peano (..),
     MonSem (..),
     Sig (..),
     Handler (..),
@@ -11,41 +11,24 @@ module Language (
     Mode (..),
     subst,
     reduce,
-    add,
-    sub,
-    ppred,
 )
 where
 
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.List (intercalate)
+import Nat (Nat(..))
 
 type Identifier = String
 
-data Peano = Zero | Succ Peano deriving (Show)
+data Val sig where
+    NumVal :: (Nat n, Show n) => n -> Val sig
+    BoolVal :: Bool -> Val sig
+    LamVal :: Identifier -> Exp sig -> Val sig
+    RecLamVal :: Identifier -> Identifier -> Exp sig -> Val sig
+    IdentifierVal :: Identifier -> Val sig
 
-ppred :: Peano -> Peano
-ppred Zero = Zero
-ppred (Succ n) = n
-
-add :: Peano -> Peano -> Peano
-add Zero n = n
-add (Succ m) n = Succ (add m n)
-
-sub :: Peano -> Peano -> Peano
-sub _ Zero = Zero
-sub Zero _ = Zero
-sub (Succ m) (Succ n) = sub m n
-
-data Val sig
-    = NumVal Peano
-    | BoolVal Bool
-    | LamVal Identifier (Exp sig)
-    | RecLamVal Identifier Identifier (Exp sig)
-    | IdentifierVal Identifier
-
-instance (Show sig) => Show (Val sig) where
+instance Show sig => Show (Val sig) where
     show v = case v of
         NumVal n -> show n
         BoolVal b -> show b
@@ -176,14 +159,21 @@ reducePure e = case e of
     App v@(RecLamVal f x body) arg -> Just $ (subst f v . subst x arg) body
     If (BoolVal True) bThen _ -> Just bThen
     If (BoolVal False) _ bElse -> Just bElse
-    Plus (NumVal a) (NumVal b) -> Just $ Ret $ NumVal $ add a b
-    Minus (NumVal a) (NumVal b) -> Just $ Ret $ NumVal $ sub a b
+    Plus (NumVal a) (NumVal b) -> Just $ Ret $ NumVal $ f a b
+        where
+            f x y
+                | isZero x = y
+                | otherwise = succ $ f x (pred y)
+    Minus (NumVal a) (NumVal b) -> Just $ Ret $ NumVal $ f a b
+        where
+            f x y
+                | isZero y = x
+                | otherwise = f (pred x) (pred y)
     And (BoolVal a) (BoolVal b) -> Just $ Ret $ BoolVal (a && b)
     Or (BoolVal a) (BoolVal b) -> Just $ Ret $ BoolVal (a || b)
-    IsZero (NumVal Zero) -> Just $ Ret $ BoolVal True
-    IsZero (NumVal _) -> Just $ Ret $ BoolVal False
-    Suc (NumVal n) -> Just $ Ret $ NumVal $ Succ n
-    Pred (NumVal n) -> Just $ Ret $ NumVal $ ppred n
+    IsZero (NumVal n) -> Just $ Ret $ BoolVal $ isZero n
+    Suc (NumVal n) -> Just $ Ret $ NumVal $ succ n
+    Pred (NumVal n) -> Just $ Ret $ NumVal $ pred n
     HandleWith (Do y e1 e2) h -> Just $ HandleWith e1 (h{handlerFinal = (y, HandleWith e2 h)})
     HandleWith (Ret v) (Handler _ (x, e')) -> Just $ Do x (Ret v) e'
     HandleWith (Magic op vs) (Handler cs (finalVar, finalBody)) ->

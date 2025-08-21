@@ -43,6 +43,7 @@ library:
     - Language
     - Effects.Nondeterminism
     - Effects.Exceptions
+    - Nat
 
 executables:
   monadic-semantic-calculus-exe:

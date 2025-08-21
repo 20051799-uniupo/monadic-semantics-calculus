@@ -22,6 +22,7 @@ library
       Language
       Effects.Nondeterminism
       Effects.Exceptions
+      Nat
   other-modules:
       Paths_monadic_semantic_calculus
   autogen-modules:
