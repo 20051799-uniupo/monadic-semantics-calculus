@@ -24,6 +24,7 @@ dependencies:
 - megaparsec
 - hspec
 - containers
+- mtl
 
 ghc-options:
 - -Wall
@@ -44,6 +45,8 @@ library:
     - Effects.Nondeterminism
     - Effects.Exceptions
     - Nat
+    - TypeCheck
+  default-extensions: GHC2021
 
 executables:
   monadic-semantic-calculus-exe:
@@ -55,6 +58,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - monadic-semantic-calculus
+    default-extensions: GHC2021
 
 tests:
   monadic-semantic-calculus-test:
@@ -66,3 +70,4 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - monadic-semantic-calculus
+    default-extensions: GHC2021

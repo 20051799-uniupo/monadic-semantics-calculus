@@ -2,6 +2,7 @@
 {-# LANGUAGE GADTs #-}
 
 module Language (
+    Identifier,
     Val (..),
     Exp (..),
     MonSem (..),
@@ -22,7 +23,7 @@ import Nat (Nat(..))
 type Identifier = String
 
 data Val sig where
-    NumVal :: (Nat n, Show n) => n -> Val sig
+    NatVal :: (Nat n, Show n) => n -> Val sig
     BoolVal :: Bool -> Val sig
     LamVal :: Identifier -> Exp sig -> Val sig
     RecLamVal :: Identifier -> Identifier -> Exp sig -> Val sig
@@ -30,7 +31,7 @@ data Val sig where
 
 instance Show sig => Show (Val sig) where
     show v = case v of
-        NumVal n -> show n
+        NatVal n -> show n
         BoolVal b -> show b
         LamVal x e -> "λ" ++ x ++ "." ++ show e
         RecLamVal f x e -> "rec " ++ f ++ ".λ" ++ x ++ "." ++ show e
@@ -159,21 +160,21 @@ reducePure e = case e of
     App v@(RecLamVal f x body) arg -> Just $ (subst f v . subst x arg) body
     If (BoolVal True) bThen _ -> Just bThen
     If (BoolVal False) _ bElse -> Just bElse
-    Plus (NumVal a) (NumVal b) -> Just $ Ret $ NumVal $ f a b
+    Plus (NatVal a) (NatVal b) -> Just $ Ret $ NatVal $ f a b
         where
             f x y
                 | isZero x = y
                 | otherwise = succ $ f x (pred y)
-    Minus (NumVal a) (NumVal b) -> Just $ Ret $ NumVal $ f a b
+    Minus (NatVal a) (NatVal b) -> Just $ Ret $ NatVal $ f a b
         where
             f x y
                 | isZero y = x
                 | otherwise = f (pred x) (pred y)
     And (BoolVal a) (BoolVal b) -> Just $ Ret $ BoolVal (a && b)
     Or (BoolVal a) (BoolVal b) -> Just $ Ret $ BoolVal (a || b)
-    IsZero (NumVal n) -> Just $ Ret $ BoolVal $ isZero n
-    Suc (NumVal n) -> Just $ Ret $ NumVal $ succ n
-    Pred (NumVal n) -> Just $ Ret $ NumVal $ pred n
+    IsZero (NatVal n) -> Just $ Ret $ BoolVal $ isZero n
+    Suc (NatVal n) -> Just $ Ret $ NatVal $ succ n
+    Pred (NatVal n) -> Just $ Ret $ NatVal $ pred n
     HandleWith (Do y e1 e2) h -> Just $ HandleWith e1 (h{handlerFinal = (y, HandleWith e2 h)})
     HandleWith (Ret v) (Handler _ (x, e')) -> Just $ Do x (Ret v) e'
     HandleWith (Magic op vs) (Handler cs (finalVar, finalBody)) ->
