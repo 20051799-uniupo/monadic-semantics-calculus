@@ -18,7 +18,14 @@ type ExpType = (ValType, EffectType)
 type Substitutions = Map.Map Int ValType
 type InferenceState = (Int, Substitutions)
 
-type InferM a = StateT InferenceState Maybe a
+data Error
+    = UnboundVariable Identifier
+    | IfBranchesMismatch ValType ValType
+    | TypesNotUnifiable ValType ValType
+    | SelfReferentialBind Int
+    deriving (Show)
+
+type InferM a = StateT InferenceState (Either Error) a
 
 fresh :: InferM ValType
 fresh = state $ \(count, substs) -> (TypeVar count, (count + 1, substs))
@@ -29,6 +36,7 @@ apply s t = case t of
     ArrType t1 e t2 -> ArrType (apply s t1) e (apply s t2)
     _ -> t
 
+-- unify :: ValType -> ValType -> (ValType -> ValType -> Error) -> InferM ()
 unify :: ValType -> ValType -> InferM ()
 unify t1 t2 = do
     (_, s) <- get
@@ -39,13 +47,13 @@ unify t1 t2 = do
         else case (t1', t2') of
             (TypeVar i, t) -> varBind i t
             (t, TypeVar i) -> varBind i t
-            (ArrType x1 _ e1, ArrType x2 _ e2) -> unify x1 e1 >> unify x2 e2
-            _ -> lift Nothing
+            (ArrType x1 _ e1, ArrType x2 _ e2) -> unify x1 x2 >> unify e1 e2
+            _ -> lift $ Left $ TypesNotUnifiable t1' t2'
 
 varBind :: Int -> ValType -> InferM ()
 varBind i t =
     if (occursCheck i t)
-        then lift Nothing
+        then lift $ Left $ SelfReferentialBind i
         else modify $ \(c, s) -> (c, Map.insert i t s)
 
 occursCheck :: Int -> ValType -> Bool
@@ -60,7 +68,9 @@ typeOfVal :: Val sig -> Context -> InferM ValType
 typeOfVal v c = case v of
     NatVal _ -> pure NatType
     BoolVal _ -> pure BoolType
-    IdentifierVal x -> lift $ Map.lookup x c
+    IdentifierVal x -> case Map.lookup x c of
+        Just t -> pure t
+        Nothing -> lift $ Left $ UnboundVariable x
     LamVal x e -> do
         xType <- fresh
         let c' = Map.insert x xType c
@@ -115,7 +125,7 @@ typeOfExp e c = case e of
         bType <- typeOfVal b c
         unify bType BoolType
 
-        pure (NatType, ())
+        pure (BoolType, ())
     Or a b -> do
         aType <- typeOfVal a c
         unify aType BoolType
@@ -123,7 +133,7 @@ typeOfExp e c = case e of
         bType <- typeOfVal b c
         unify bType BoolType
 
-        pure (NatType, ())
+        pure (BoolType, ())
     IsZero a -> do
         aType <- typeOfVal a c
         unify aType NatType
@@ -138,7 +148,8 @@ typeOfExp e c = case e of
         pure (NatType, ())
     _ -> undefined
 
-typeOf :: Exp sig -> Maybe ExpType
+typeOf :: Exp sig -> Either Error ExpType
 typeOf e = do
-    (t, (_, _)) <- runStateT (typeOfExp e Map.empty) (0, Map.empty)
-    pure t
+    ((t, ()), (_, s)) <- runStateT (typeOfExp e Map.empty) (0, Map.empty)
+    let t' = apply s t
+    pure (t', ())
