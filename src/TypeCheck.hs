@@ -1,20 +1,22 @@
 module TypeCheck (
+    ValType,
     typeOf,
 ) where
+
+import Types (ValType(..), ExpType)
 
 import Language (
     Exp (..),
     Identifier,
     Val (..),
+    Sig,
+    Handler(..),
+    signature,
  )
 
-import Control.Monad (unless)
+import Control.Monad (unless, forM_, when)
 import Control.Monad.State
 import Data.Map qualified as Map
-
-data ValType = NatType | BoolType | ArrType ValType EffectType ValType | TypeVar Int deriving (Show, Eq)
-type EffectType = ()
-type ExpType = (ValType, EffectType)
 
 type Substitutions = Map.Map Int ValType
 type InferenceState = (Int, Substitutions)
@@ -23,6 +25,7 @@ data Error
     = UnboundVariable Identifier
     | TypesNotUnifiable ValType ValType
     | SelfReferentialBind Int
+    | ArityMismatch Int Int
     deriving (Show)
 
 type InferM a = StateT InferenceState (Either Error) a
@@ -65,7 +68,7 @@ createsCycle i t = case t of
 
 type Context = Map.Map Identifier ValType
 
-typeOfVal :: Val sig -> Context -> InferM ValType
+typeOfVal :: (Sig sig) => Val sig -> Context -> InferM ValType
 typeOfVal v c = case v of
     NatVal _ -> pure NatType
     BoolVal _ -> pure BoolType
@@ -85,7 +88,7 @@ typeOfVal v c = case v of
         unify fType (ArrType xType () t_e)
         pure fType
 
-typeOfExp :: Exp sig -> Context -> InferM ExpType
+typeOfExp :: (Sig sig) => Exp sig -> Context -> InferM ExpType
 typeOfExp e c = case e of
     Ret v -> (,()) <$> (typeOfVal v c)
     App f x -> do
@@ -147,9 +150,24 @@ typeOfExp e c = case e of
         aType <- typeOfVal a c
         unify aType NatType
         pure (NatType, ())
-    _ -> undefined
+    Do x e1 e2 -> do
+        (e1Type, ()) <- typeOfExp e1 c
+        let c' = Map.insert x e1Type c
+        typeOfExp e2 c'
+    Magic op vs -> do
+        let (vsTypes, t) = signature op
+        when (length vs /= length vsTypes) $ lift $ Left $ ArityMismatch (length vs) (length vsTypes)
+        forM_ (zip vs vsTypes) $ \(v, vType) -> do
+            vType' <- typeOfVal v c
+            unify vType' vType
+        pure (t, ())
+    HandleWith e1 (Handler _cs (x, e')) -> do
+        (t, ()) <- typeOfExp e1 c
+        let c' = Map.insert x t c
+        (t', ()) <- typeOfExp e' c'
+        pure (t', ())
 
-typeOf :: Exp sig -> Either Error ExpType
+typeOf :: (Sig sig) => Exp sig -> Either Error ExpType
 typeOf e = do
     ((t, ()), (_, s)) <- runStateT (typeOfExp e Map.empty) (0, Map.empty)
     let t' = apply s t

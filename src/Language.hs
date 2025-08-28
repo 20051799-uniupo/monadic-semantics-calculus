@@ -18,7 +18,9 @@ where
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.List (intercalate)
+
 import Nat (Nat(..))
+import Types (ValType)
 
 type Identifier = String
 
@@ -149,7 +151,7 @@ substs :: [(Identifier, Val sig)] -> Exp sig -> Exp sig
 substs substitutions expr = foldr (\(var, val) e -> subst var val e) expr substitutions
 
 class Sig s where
-    arity :: s -> Int
+    signature :: s -> ([ValType], ValType)
 
 class (Monad m, Sig sig) => MonSem m sig where
     run :: sig -> [Val sig] -> m (Val sig)

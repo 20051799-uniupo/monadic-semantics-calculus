@@ -3,9 +3,8 @@ import Data.Map (fromList)
 import Effects.Exceptions
 import Effects.Nondeterminism
 import Language
-import Nat (Nat(..), Peano)
+import Nat (Nat (..), Peano)
 import TypeCheck (typeOf)
-import qualified Data.Map as Map
 
 main :: IO ()
 main = do
@@ -206,36 +205,40 @@ main = do
     let e8 = HandleWith ndExp h2
     putStrLn $ show e8 ++ " =>* " ++ show (evalFin e8 :: [Res NDSig])
 
-
-    let e9 = Ret $ LamVal "x" (Plus (IdentifierVal "x") (NatVal (zero :: Peano)))
+    let e9 = Ret $ LamVal "x" (Plus (IdentifierVal "x") (NatVal (zero :: Peano))) :: Exp NDSig
     let t = typeOf e9
-    putStrLn $ show t
+    putStrLn $ "typeOf " ++ show e9 ++ " = " ++ show t
 
-    let e10 = App (LamVal "y" (App (LamVal "x" (Ret (IdentifierVal "x"))) (IdentifierVal "y"))) (NatVal (zero :: Peano))
+    let e10 = App (LamVal "y" (App (LamVal "x" (Ret (IdentifierVal "x"))) (IdentifierVal "y"))) (NatVal (zero :: Peano)) :: Exp NDSig
     putStrLn $ show $ typeOf e10
 
-    let e11 = App (LamVal "x" (Ret (IdentifierVal "x"))) (NatVal (zero :: Peano))
+    let e11 = App (LamVal "x" (Ret (IdentifierVal "x"))) (NatVal (zero :: Peano)) :: Exp NDSig
     putStrLn $ show $ typeOf e11
 
-    let e12 = Ret (LamVal "x" (Ret $ IdentifierVal "x"))
+    let e12 = Ret (LamVal "x" (Ret $ IdentifierVal "x")) :: Exp NDSig
     putStrLn $ show $ typeOf e12
 
-    let e12 = Ret (LamVal "x" (Ret $ BoolVal True))
-    putStrLn $ show $ typeOf e12
-
-    let e13 = Ret (LamVal "x" (App (LamVal "x" (Plus (IdentifierVal "x") (NatVal (zero :: Peano)))) (IdentifierVal "x")))
-    -- lx.( ( lx. 0) x)
+    let e13 = Ret (LamVal "x" (Ret $ BoolVal True)) :: Exp NDSig
     putStrLn $ show $ typeOf e13
 
-    let e13 = Ret (LamVal "x" (App (LamVal "x" (IsZero (IdentifierVal "x"))) (IdentifierVal "x")))
-    -- lx.( ( lx. 0) x)
-    putStrLn $ show $ typeOf e13
-    
-    -- let e = App (LamVal "x" (App (LamVal "y" (Ret (IdentifierVal "y"))) (IdentifierVal "x"))) (NatVal (zero :: Peano))
-    -- putStrLn $ show $ typeOf e
-    let e = App (LamVal "id" (App (LamVal "f" (Ret (IdentifierVal "f"))) (IdentifierVal "id"))) (LamVal "y" (Ret (IdentifierVal "y")))
-    putStrLn $ show $ typeOf e
+    let e14 = Ret (LamVal "x" (App (LamVal "x" (Plus (IdentifierVal "x") (NatVal (zero :: Peano)))) (IdentifierVal "x"))) :: Exp NDSig
+    putStrLn $ show $ typeOf e14
 
-  
+    let e15 = Ret (LamVal "x" (App (LamVal "x" (IsZero (IdentifierVal "x"))) (IdentifierVal "x"))) :: Exp NDSig
+    putStrLn $ show $ typeOf e15
+
+    let e16 = App (LamVal "id" (App (LamVal "f" (Ret (IdentifierVal "f"))) (IdentifierVal "id"))) (LamVal "y" (Ret (IdentifierVal "y"))) :: Exp NDSig
+    putStrLn $ show $ typeOf e16
+
+    let e17 = App (LamVal "x" (Ret (IdentifierVal "x"))) (LamVal "y" (Ret (IdentifierVal "y"))) :: Exp NDSig
+    putStrLn $ show $ typeOf e17
+
+    let e18 =
+            App
+                (LamVal "f" (App (IdentifierVal "f") (NatVal (zero :: Peano))))
+                (LamVal "x" (Ret (IdentifierVal "x"))) ::
+                Exp NDSig
+
+    putStrLn $ show $ typeOf e18
 
     pure ()

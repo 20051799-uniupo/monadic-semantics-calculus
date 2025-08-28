@@ -6,11 +6,13 @@ module Effects.Exceptions
 where
 
 import Language
+import Types(ValType(NatType))
 
 data ExceptionSig e = Raise e deriving (Show, Eq, Ord)
 
 instance Sig (ExceptionSig e) where
-  arity (Raise _) = 0
+    -- FIXME: `NatType` is wrong, should instead introduce `ValType(Bot)` but needs proper subtyping
+    signature (Raise _) = ([], NatType)
 
 instance MonSem (Either e) (ExceptionSig e) where
   run (Raise e) [] = Left e

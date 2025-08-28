@@ -24,6 +24,7 @@ library
       Effects.Exceptions
       Nat
       TypeCheck
+      Types
   other-modules:
       Paths_monadic_semantic_calculus
   autogen-modules:

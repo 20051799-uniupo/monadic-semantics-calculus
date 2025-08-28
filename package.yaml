@@ -46,6 +46,7 @@ library:
     - Effects.Exceptions
     - Nat
     - TypeCheck
+    - Types
   default-extensions: GHC2021
 
 executables:
