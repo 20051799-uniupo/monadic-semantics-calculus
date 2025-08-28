@@ -1,3 +1,4 @@
+-- TODO: use proper test framework
 import Core
 import Data.Map (fromList)
 import Effects.Exceptions
@@ -205,40 +206,36 @@ main = do
     let e8 = HandleWith ndExp h2
     putStrLn $ show e8 ++ " =>* " ++ show (evalFin e8 :: [Res NDSig])
 
+    putStrLn "--- Eaxmple typechecking ---"
     let e9 = Ret $ LamVal "x" (Plus (IdentifierVal "x") (NatVal (zero :: Peano))) :: Exp NDSig
     let t = typeOf e9
     putStrLn $ "typeOf " ++ show e9 ++ " = " ++ show t
 
     let e10 = App (LamVal "y" (App (LamVal "x" (Ret (IdentifierVal "x"))) (IdentifierVal "y"))) (NatVal (zero :: Peano)) :: Exp NDSig
-    putStrLn $ show $ typeOf e10
+    putStrLn $ "typeOf " ++ show e10 ++ " = " ++ show t
 
     let e11 = App (LamVal "x" (Ret (IdentifierVal "x"))) (NatVal (zero :: Peano)) :: Exp NDSig
-    putStrLn $ show $ typeOf e11
+    putStrLn $ "typeOf " ++ show e11 ++ " = " ++ show t
 
     let e12 = Ret (LamVal "x" (Ret $ IdentifierVal "x")) :: Exp NDSig
-    putStrLn $ show $ typeOf e12
+    putStrLn $ "typeOf " ++ show e12 ++ " = " ++ show t
 
     let e13 = Ret (LamVal "x" (Ret $ BoolVal True)) :: Exp NDSig
-    putStrLn $ show $ typeOf e13
+    putStrLn $ "typeOf " ++ show e13 ++ " = " ++ show t
 
     let e14 = Ret (LamVal "x" (App (LamVal "x" (Plus (IdentifierVal "x") (NatVal (zero :: Peano)))) (IdentifierVal "x"))) :: Exp NDSig
-    putStrLn $ show $ typeOf e14
+    putStrLn $ "typeOf " ++ show e14 ++ " = " ++ show t
 
     let e15 = Ret (LamVal "x" (App (LamVal "x" (IsZero (IdentifierVal "x"))) (IdentifierVal "x"))) :: Exp NDSig
-    putStrLn $ show $ typeOf e15
+    putStrLn $ "typeOf " ++ show e15 ++ " = " ++ show t
 
     let e16 = App (LamVal "id" (App (LamVal "f" (Ret (IdentifierVal "f"))) (IdentifierVal "id"))) (LamVal "y" (Ret (IdentifierVal "y"))) :: Exp NDSig
-    putStrLn $ show $ typeOf e16
+    putStrLn $ "typeOf " ++ show e16 ++ " = " ++ show t
 
     let e17 = App (LamVal "x" (Ret (IdentifierVal "x"))) (LamVal "y" (Ret (IdentifierVal "y"))) :: Exp NDSig
-    putStrLn $ show $ typeOf e17
+    putStrLn $ "typeOf " ++ show e17 ++ " = " ++ show t
 
-    let e18 =
-            App
-                (LamVal "f" (App (IdentifierVal "f") (NatVal (zero :: Peano))))
-                (LamVal "x" (Ret (IdentifierVal "x"))) ::
-                Exp NDSig
-
-    putStrLn $ show $ typeOf e18
+    let e18 = App (LamVal "f" (App (IdentifierVal "f") (NatVal (zero :: Peano)))) (LamVal "x" (Ret (IdentifierVal "x"))) :: Exp NDSig
+    putStrLn $ "typeOf " ++ show e18 ++ " = " ++ show t
 
     pure ()
