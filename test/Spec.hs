@@ -210,3 +210,32 @@ main = do
     let e9 = Ret $ LamVal "x" (Plus (IdentifierVal "x") (NatVal (zero :: Peano)))
     let t = typeOf e9
     putStrLn $ show t
+
+    let e10 = App (LamVal "y" (App (LamVal "x" (Ret (IdentifierVal "x"))) (IdentifierVal "y"))) (NatVal (zero :: Peano))
+    putStrLn $ show $ typeOf e10
+
+    let e11 = App (LamVal "x" (Ret (IdentifierVal "x"))) (NatVal (zero :: Peano))
+    putStrLn $ show $ typeOf e11
+
+    let e12 = Ret (LamVal "x" (Ret $ IdentifierVal "x"))
+    putStrLn $ show $ typeOf e12
+
+    let e12 = Ret (LamVal "x" (Ret $ BoolVal True))
+    putStrLn $ show $ typeOf e12
+
+    let e13 = Ret (LamVal "x" (App (LamVal "x" (Plus (IdentifierVal "x") (NatVal (zero :: Peano)))) (IdentifierVal "x")))
+    -- lx.( ( lx. 0) x)
+    putStrLn $ show $ typeOf e13
+
+    let e13 = Ret (LamVal "x" (App (LamVal "x" (IsZero (IdentifierVal "x"))) (IdentifierVal "x")))
+    -- lx.( ( lx. 0) x)
+    putStrLn $ show $ typeOf e13
+    
+    -- let e = App (LamVal "x" (App (LamVal "y" (Ret (IdentifierVal "y"))) (IdentifierVal "x"))) (NatVal (zero :: Peano))
+    -- putStrLn $ show $ typeOf e
+    let e = App (LamVal "id" (App (LamVal "f" (Ret (IdentifierVal "f"))) (IdentifierVal "id"))) (LamVal "y" (Ret (IdentifierVal "y")))
+    putStrLn $ show $ typeOf e
+
+  
+
+    pure ()

@@ -8,6 +8,7 @@ import Language (
     Val (..),
  )
 
+import Control.Monad (unless)
 import Control.Monad.State
 import Data.Map qualified as Map
 
@@ -20,7 +21,6 @@ type InferenceState = (Int, Substitutions)
 
 data Error
     = UnboundVariable Identifier
-    | IfBranchesMismatch ValType ValType
     | TypesNotUnifiable ValType ValType
     | SelfReferentialBind Int
     deriving (Show)
@@ -42,24 +42,25 @@ unify t1 t2 = do
     (_, s) <- get
     let t1' = apply s t1
     let t2' = apply s t2
-    if t1' == t2'
-        then pure ()
-        else case (t1', t2') of
+    unless
+        (t1' == t2')
+        ( case (t1', t2') of
             (TypeVar i, t) -> varBind i t
             (t, TypeVar i) -> varBind i t
             (ArrType x1 _ e1, ArrType x2 _ e2) -> unify x1 x2 >> unify e1 e2
             _ -> lift $ Left $ TypesNotUnifiable t1' t2'
+        )
 
 varBind :: Int -> ValType -> InferM ()
 varBind i t =
-    if (occursCheck i t)
+    if (createsCycle i t)
         then lift $ Left $ SelfReferentialBind i
         else modify $ \(c, s) -> (c, Map.insert i t s)
 
-occursCheck :: Int -> ValType -> Bool
-occursCheck i t = case t of
+createsCycle :: Int -> ValType -> Bool
+createsCycle i t = case t of
     TypeVar j -> i == j
-    (ArrType t1 _ t2) -> occursCheck i t1 || occursCheck i t2
+    (ArrType t1 _ t2) -> createsCycle i t1 || createsCycle i t2
     _ -> False
 
 type Context = Map.Map Identifier ValType
