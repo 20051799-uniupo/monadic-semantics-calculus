@@ -24,6 +24,7 @@ data Error
     | ReturnTypeMismatch ExpType ExpType
     | ArgTypeMismatch ValType ValType
     | UnapplicableType ValType
+    | TypeMismatch ValType ValType
     deriving (Show)
 
 type Context = Map.Map Identifier ValType
@@ -47,6 +48,20 @@ typeOfVal v c = case v of
         t''e' <- typeOfExp b c'
         unless (t''e' <: ExpType (t', e)) $ Left $ ReturnTypeMismatch (ExpType (t', e)) t''e'
         pure $ ArrType r
+        
+requireNat :: (Sig sig) => Val sig -> Context -> Failable ()
+requireNat x c = do
+    t <- typeOfVal x c
+    case t of
+        NatType -> Right ()
+        _ -> Left $ TypeMismatch NatType t
+
+requireBool :: (Sig sig) => Val sig -> Context -> Failable ()
+requireBool x c = do
+    t <- typeOfVal x c
+    case t of
+        BoolType -> Right ()
+        _ -> Left $ TypeMismatch BoolType t
 
 typeOfExp :: (Sig sig) => Exp sig -> Context -> Failable ExpType
 typeOfExp e c = case e of
@@ -57,14 +72,12 @@ typeOfExp e c = case e of
         case fT of
             (ArrType (ArrType' (t1, e, t))) -> if (t2 <: t1) then (pure $ ExpType (t, e)) else Left $ ArgTypeMismatch t1 t2
             _ -> Left $ UnapplicableType fT
-    -- If p bT bE -> do
-    --     pType <- typeOfVal p c
-    --     unify pType BoolType
-
-    --     (bTType, ()) <- typeOfExp bT c
-    --     (bEType, ()) <- typeOfExp bE c
-    --     unify bTType bEType
--- 
+    If p bT bE -> do
+        requireBool p c 
+        tT <- typeOfExp bT c
+        tE <- typeOfExp bE c
+        pure $ tT `join` tE
+        
     --      pure (bTType, ())
 --     Plus a b -> do
 --         aType <- typeOfVal a c
