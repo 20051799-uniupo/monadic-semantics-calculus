@@ -28,6 +28,7 @@ instance SubType ValType where
     BoolType <: BoolType = True
     ArrType (ArrType' (t1, e, t2)) <: ArrType (ArrType' (t1', e', t2')) = t1' <: t1 && t2 <: t2' && e <= e'
     BotType <: _ = True
+    _ <: TopType = True
     _ <: _ = False
 
     join t1 t2
