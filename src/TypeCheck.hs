@@ -11,11 +11,10 @@ import Language (
     Val (..),
     Sig,
     Handler(..),
-    signature,
+    arity,
  )
 
 import Control.Monad (unless, forM_, when)
-import Control.Monad.State
 import Data.Map qualified as Map
 
 data Error
@@ -38,30 +37,20 @@ typeOfVal v c = case v of
     IdentifierVal x -> case Map.lookup x c of
         Just t -> pure t
         Nothing -> Left $ UnboundVariable x
-    LamVal x b r@(ArrType' (t, e, t')) -> do
+    LamVal x t b -> do
         let c' = Map.insert x t c
-        t''e' <- typeOfExp b c'
-        unless (t''e' <: ExpType (t', e)) $ Left $ ReturnTypeMismatch (ExpType (t', e)) t''e'
-        pure $ ArrType r
-    RecLamVal f x b r@(ArrType' (t, e, t')) -> do
+        ExpType (t', e) <- typeOfExp b c'
+        pure $ ArrType (ArrType' (t, e, t'))
+    RecLamVal f r@(ArrType' (t, e, t')) x b  -> do
         let c' = Map.insert f (ArrType r) (Map.insert x t c)
         t''e' <- typeOfExp b c'
         unless (t''e' <: ExpType (t', e)) $ Left $ ReturnTypeMismatch (ExpType (t', e)) t''e'
         pure $ ArrType r
-        
-requireNat :: (Sig sig) => Val sig -> Context -> Failable ()
-requireNat x c = do
-    t <- typeOfVal x c
-    case t of
-        NatType -> Right ()
-        _ -> Left $ TypeMismatch NatType t
 
-requireBool :: (Sig sig) => Val sig -> Context -> Failable ()
-requireBool x c = do
-    t <- typeOfVal x c
-    case t of
-        BoolType -> Right ()
-        _ -> Left $ TypeMismatch BoolType t
+require :: (Sig sig) => Val sig -> ValType -> Context -> Failable ()
+require x t c = do
+    t' <- typeOfVal x c
+    if (t <: t') then Right() else Left $ TypeMismatch t t'
 
 typeOfExp :: (Sig sig) => Exp sig -> Context -> Failable ExpType
 typeOfExp e c = case e of
@@ -70,79 +59,53 @@ typeOfExp e c = case e of
         fT <- typeOfVal f c
         t2 <- typeOfVal x c
         case fT of
-            (ArrType (ArrType' (t1, e, t))) -> if (t2 <: t1) then (pure $ ExpType (t, e)) else Left $ ArgTypeMismatch t1 t2
+            (ArrType (ArrType' (t1, e', t))) -> if (t2 <: t1) then (pure $ ExpType (t, e')) else Left $ ArgTypeMismatch t1 t2
             _ -> Left $ UnapplicableType fT
     If p bT bE -> do
-        requireBool p c 
+        require p BoolType c
         tT <- typeOfExp bT c
         tE <- typeOfExp bE c
         pure $ tT `join` tE
-        
-    --      pure (bTType, ())
---     Plus a b -> do
---         aType <- typeOfVal a c
---         unify aType NatType
--- 
---         bType <- typeOfVal b c
---         unify bType NatType
--- 
---         pure (NatType, ())
---     Minus a b -> do
---         aType <- typeOfVal a c
---         unify aType NatType
--- 
---         bType <- typeOfVal b c
---         unify bType NatType
--- 
---         pure (NatType, ())
---     And a b -> do
---         aType <- typeOfVal a c
---         unify aType BoolType
--- 
---         bType <- typeOfVal b c
---         unify bType BoolType
--- 
---         pure (BoolType, ())
---     Or a b -> do
---         aType <- typeOfVal a c
---         unify aType BoolType
--- 
---         bType <- typeOfVal b c
---         unify bType BoolType
--- 
---         pure (BoolType, ())
---     IsZero a -> do
---         aType <- typeOfVal a c
---         unify aType NatType
---         pure (BoolType, ())
---     Suc a -> do
---         aType <- typeOfVal a c
---         unify aType NatType
---         pure (NatType, ())
---     Pred a -> do
---         aType <- typeOfVal a c
---         unify aType NatType
---         pure (NatType, ())
---     Do x e1 e2 -> do
---         (e1Type, ()) <- typeOfExp e1 c
---         let c' = Map.insert x e1Type c
---         typeOfExp e2 c'
---     Magic op vs -> do
---         let (vsTypes, t) = signature op
---         when (length vs /= length vsTypes) $ lift $ Left $ ArityMismatch (length vs) (length vsTypes)
---         forM_ (zip vs vsTypes) $ \(v, vType) -> do
---             vType' <- typeOfVal v c
---             unify vType' vType
---         pure (t, ())
---     HandleWith e1 (Handler _cs (x, e')) -> do
---         (t, ()) <- typeOfExp e1 c
---         let c' = Map.insert x t c
---         (t', ()) <- typeOfExp e' c'
---         pure (t', ())
--- 
--- typeOf :: (Sig sig) => Exp sig -> Failable ExpType
-typeOf e = do
-    -- ((t, ()), (_, s)) <- runStateT (typeOfExp e Map.empty) (0, Map.empty)
-    -- let t' = apply s t
-    -- pure (t', ())
-    undefined
+    Plus a b -> do
+        require a NatType c
+        require b NatType c
+        pure $ ExpType (NatType, ())
+    Minus a b -> do
+        require a NatType c
+        require b NatType c
+        pure $ ExpType (NatType, ())
+    And a b -> do
+        require a BoolType c
+        require b BoolType c
+        pure $ ExpType (BoolType, ())
+    Or a b -> do
+        require a BoolType c
+        require b BoolType c
+        pure $ ExpType (BoolType, ())
+    IsZero a -> do
+        require a NatType c
+        pure $ ExpType (BoolType, ())
+    Suc a -> do
+        require a NatType c
+        pure $ ExpType (NatType, ())
+    Pred a -> do
+        require a NatType c
+        pure $ ExpType (NatType, ())
+    Do x e1 e2 -> do
+        ExpType (t1, ()) <- typeOfExp e1 c
+        let c' = Map.insert x t1 c
+        typeOfExp e2 c'
+    Magic op vs -> do
+        let (vsTypes, t) = arity op
+        when (length vs /= length vsTypes) $ Left $ ArityMismatch (length vs) (length vsTypes)
+        forM_ (zip vs vsTypes) $ \(v, vType) -> do
+            require v vType c
+        pure $ ExpType (t, ())
+    HandleWith e1 (Handler _ (x, e')) -> do
+        ExpType (t, ()) <- typeOfExp e1 c
+        let c' = Map.insert x t c
+        ExpType (t', ()) <- typeOfExp e' c'
+        pure $ ExpType (t', ())
+
+typeOf :: (Sig sig) => Exp sig -> Failable ExpType
+typeOf e = typeOfExp e Map.empty

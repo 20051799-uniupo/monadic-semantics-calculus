@@ -20,23 +20,23 @@ import qualified Data.Map as Map
 import Data.List (intercalate)
 
 import Nat (Nat(..))
-import Types (ValType, ArrType'(..), ExpType(..))
+import Types (ValType(ArrType), ArrType'(..))
 
 type Identifier = String
 
 data Val sig where
     NatVal :: (Nat n, Show n) => n -> Val sig
     BoolVal :: Bool -> Val sig
-    LamVal :: Identifier -> Exp sig -> ArrType' -> Val sig
-    RecLamVal :: Identifier -> Identifier -> Exp sig -> ArrType' -> Val sig
+    LamVal :: Identifier -> ValType -> Exp sig -> Val sig
+    RecLamVal :: Identifier -> ArrType' -> Identifier -> Exp sig -> Val sig
     IdentifierVal :: Identifier -> Val sig
 
 instance Show sig => Show (Val sig) where
     show v = case v of
         NatVal n -> show n
         BoolVal b -> show b
-        LamVal x b (ArrType' (t, e, t')) -> "λ" ++ x ++ ": " ++ show t ++ "." ++ show b ++ ": " ++ show (ExpType (t', e))
-        RecLamVal f x b t -> "rec " ++ f ++ "." ++ show (LamVal x b t)
+        LamVal x t b -> "λ" ++ x ++ ": " ++ show t ++ "." ++ show b
+        RecLamVal f t x b -> "rec " ++ f ++ ": " ++ show (ArrType t) ++ "." ++ x ++ "." ++ show b
         IdentifierVal x -> x
 
 data Mode = Continue | Stop
@@ -120,12 +120,12 @@ instance (Show sig) => Show (Exp sig) where
 
 substVal :: Identifier -> Val sig -> Val sig -> Val sig
 substVal varName val (IdentifierVal x) | x == varName = val
-substVal varName val (LamVal x body t)
-    | x == varName = LamVal x body t
-    | otherwise = LamVal x (subst varName val body) t
-substVal varName val v@(RecLamVal f x body t)
+substVal varName val (LamVal x t body)
+    | x == varName = LamVal x t body
+    | otherwise = LamVal x t (subst varName val body)
+substVal varName val v@(RecLamVal f t x body)
     | f == varName || x == varName = v
-    | otherwise = RecLamVal f x (subst varName val body) t
+    | otherwise = RecLamVal f t x (subst varName val body)
 substVal _ _ v = v
 
 subst :: Identifier -> Val sig -> Exp sig -> Exp sig
@@ -151,15 +151,15 @@ substs :: [(Identifier, Val sig)] -> Exp sig -> Exp sig
 substs substitutions expr = foldr (\(var, val) e -> subst var val e) expr substitutions
 
 class Sig s where
-    signature :: s -> ([ValType], ValType)
+    arity :: s -> ([ValType], ValType)
 
 class (Monad m, Sig sig) => MonSem m sig where
     run :: sig -> [Val sig] -> m (Val sig)
 
 reducePure :: (Ord sig) => Exp sig -> Maybe (Exp sig)
 reducePure e = case e of
-    App (LamVal var body _) arg -> Just $ subst var arg body
-    App v@(RecLamVal f x body _) arg -> Just $ (subst f v . subst x arg) body
+    App (LamVal var _ body ) arg -> Just $ subst var arg body
+    App v@(RecLamVal f _ x body) arg -> Just $ (subst f v . subst x arg) body
     If (BoolVal True) bThen _ -> Just bThen
     If (BoolVal False) _ bElse -> Just bElse
     Plus (NatVal a) (NatVal b) -> Just $ Ret $ NatVal $ f a b

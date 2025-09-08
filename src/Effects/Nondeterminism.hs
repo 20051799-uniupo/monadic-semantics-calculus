@@ -11,7 +11,7 @@ import Types (ValType (BoolType))
 data NDSig = Choose deriving (Show, Eq, Ord)
 
 instance Sig NDSig where
-    signature Choose = ([], BoolType)
+    arity Choose = ([], BoolType)
 
 instance MonSem [] NDSig where
     run Choose [] = [BoolVal True, BoolVal False]
