@@ -54,7 +54,7 @@ require x t c = do
 
 typeOfExp :: (Sig sig) => Exp sig -> Context -> Failable ExpType
 typeOfExp e c = case e of
-    Ret v -> ExpType <$> (,()) <$> (typeOfVal v c)
+    Ret v -> ExpType <$> (,mempty) <$> (typeOfVal v c)
     App f x -> do
         fT <- typeOfVal f c
         t2 <- typeOfVal x c
@@ -69,30 +69,30 @@ typeOfExp e c = case e of
     Plus a b -> do
         require a NatType c
         require b NatType c
-        pure $ ExpType (NatType, ())
+        pure $ ExpType (NatType, mempty)
     Minus a b -> do
         require a NatType c
         require b NatType c
-        pure $ ExpType (NatType, ())
+        pure $ ExpType (NatType, mempty)
     And a b -> do
         require a BoolType c
         require b BoolType c
-        pure $ ExpType (BoolType, ())
+        pure $ ExpType (BoolType, mempty)
     Or a b -> do
         require a BoolType c
         require b BoolType c
-        pure $ ExpType (BoolType, ())
+        pure $ ExpType (BoolType, mempty)
     IsZero a -> do
         require a NatType c
-        pure $ ExpType (BoolType, ())
+        pure $ ExpType (BoolType, mempty)
     Suc a -> do
         require a NatType c
-        pure $ ExpType (NatType, ())
+        pure $ ExpType (NatType, mempty)
     Pred a -> do
         require a NatType c
-        pure $ ExpType (NatType, ())
+        pure $ ExpType (NatType, mempty)
     Do x e1 e2 -> do
-        ExpType (t1, ()) <- typeOfExp e1 c
+        ExpType (t1, _effect) <- typeOfExp e1 c
         let c' = Map.insert x t1 c
         typeOfExp e2 c'
     Magic op vs -> do
@@ -100,12 +100,12 @@ typeOfExp e c = case e of
         when (length vs /= length vsTypes) $ Left $ ArityMismatch (length vs) (length vsTypes)
         forM_ (zip vs vsTypes) $ \(v, vType) -> do
             require v vType c
-        pure $ ExpType (t, ())
+        pure $ ExpType (t, mempty)
     HandleWith e1 (Handler _ (x, e')) -> do
-        ExpType (t, ()) <- typeOfExp e1 c
+        ExpType (t, _effect) <- typeOfExp e1 c
         let c' = Map.insert x t c
-        ExpType (t', ()) <- typeOfExp e' c'
-        pure $ ExpType (t', ())
+        ExpType (t', _effect) <- typeOfExp e' c'
+        pure $ ExpType (t', mempty)
 
 typeOf :: (Sig sig) => Exp sig -> Failable ExpType
 typeOf e = typeOfExp e Map.empty

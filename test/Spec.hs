@@ -74,7 +74,7 @@ main = do
     let chfun =
             RecLamVal
                 "f"
-                (ArrType' (NatType, (), NatType))
+                (ArrType' (NatType, mempty, NatType))
                 "x"
                 ( Do
                     "y"
