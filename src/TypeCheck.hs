@@ -3,7 +3,7 @@ module TypeCheck (
     typeOf,
 ) where
 
-import Types (ValType(..), ExpType (..), ArrType' (..), SubType(..))
+import Types (ValType(..), ExpType (..), ArrType' (..), PartialOrd(..), Lattice(..), Effect)
 
 import Language (
     Exp (..),
@@ -17,20 +17,20 @@ import Language (
 import Control.Monad (unless, forM_, when)
 import Data.Map qualified as Map
 
-data Error
+data Error e
     = UnboundVariable Identifier
     | ArityMismatch Int Int
-    | ReturnTypeMismatch ExpType ExpType
-    | ArgTypeMismatch ValType ValType
-    | UnapplicableType ValType
-    | TypeMismatch ValType ValType
+    | ReturnTypeMismatch (ExpType e) (ExpType e)
+    | ArgTypeMismatch (ValType e) (ValType e)
+    | UnapplicableType (ValType e)
+    | TypeMismatch (ValType e) (ValType e)
     deriving (Show)
 
-type Context = Map.Map Identifier ValType
+type Context e = Map.Map Identifier (ValType e)
 
-type Failable a = Either Error a
+type Failable a e = Either (Error e) a
 
-typeOfVal :: (Sig sig) => Val sig -> Context -> Failable ValType
+typeOfVal :: (Sig sig, Effect e) => Val sig e -> Context e -> Failable (ValType e) e
 typeOfVal v c = case v of
     NatVal _ -> pure NatType
     BoolVal _ -> pure BoolType
@@ -47,12 +47,12 @@ typeOfVal v c = case v of
         unless (t''e' <: ExpType (t', e)) $ Left $ ReturnTypeMismatch (ExpType (t', e)) t''e'
         pure $ ArrType r
 
-require :: (Sig sig) => Val sig -> ValType -> Context -> Failable ()
+require :: (Sig sig, Effect e) => Val sig e -> ValType e -> Context e -> Failable () e
 require x t c = do
     t' <- typeOfVal x c
     if (t <: t') then Right() else Left $ TypeMismatch t t'
 
-typeOfExp :: (Sig sig) => Exp sig -> Context -> Failable ExpType
+typeOfExp :: (Sig sig, Effect e) => Exp sig e -> Context e -> Failable (ExpType e) e
 typeOfExp e c = case e of
     Ret v -> ExpType <$> (,mempty) <$> (typeOfVal v c)
     App f x -> do
@@ -107,5 +107,5 @@ typeOfExp e c = case e of
         ExpType (t', _effect) <- typeOfExp e' c'
         pure $ ExpType (t', mempty)
 
-typeOf :: (Sig sig) => Exp sig -> Failable ExpType
+typeOf :: (Sig sig, Effect e) => (Exp sig e) -> Failable (ExpType e) e
 typeOf e = typeOfExp e Map.empty

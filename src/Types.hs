@@ -1,31 +1,19 @@
-module Types (ValType (..), EffectType, ExpType (..), ArrType' (..), SubType (..)) where
+module Types (ValType (..), EffectSet(..), ExpType (..), ArrType' (..), PartialOrd(..), Lattice(..), Effect) where
 
 import Data.Set (Set, empty, intersection, isSubsetOf, union)
 
-newtype ArrType' = ArrType' (ValType, EffectType, ValType)
-data ValType = NatType | BoolType | ArrType ArrType' | BotType | TopType
-
-instance Show ValType where
-    show x = case x of
-        NatType -> "Nat"
-        BoolType -> "Bool"
-        ArrType (ArrType' (t, e, t')) -> show t ++ " ->" ++ show e ++ " " ++ show t'
-        BotType -> "Bot"
-        TopType -> "Top"
-
-newtype ExpType = ExpType (ValType, EffectType)
-
-instance Show ExpType where
-    show (ExpType (t, e)) = show t ++ "!" ++ show e
-
-class SubType a where
+class PartialOrd a where
     (<:) :: a -> a -> Bool
     infix 4 <:
 
+class PartialOrd a => Lattice a where
     join :: a -> a -> a
     meet :: a -> a -> a
 
-instance SubType ValType where
+newtype ArrType' e = ArrType' (ValType e, e, ValType e)
+data ValType e = NatType | BoolType | ArrType (ArrType' e) | BotType | TopType
+
+instance (PartialOrd e) => PartialOrd (ValType e) where
     NatType <: NatType = True
     BoolType <: BoolType = True
     ArrType (ArrType' (t1, e, t2)) <: ArrType (ArrType' (t1', e', t2')) = t1' <: t1 && t2 <: t2' && e <: e'
@@ -33,6 +21,7 @@ instance SubType ValType where
     _ <: TopType = True
     _ <: _ = False
 
+instance (Lattice e) => Lattice (ValType e) where
     join t1 t2
         | t1 <: t2 = t2
         | t2 <: t1 = t1
@@ -46,29 +35,46 @@ instance SubType ValType where
         | t2 <: t1 = t2
         | ArrType (ArrType' (t1', e', t2')) <- t1
         , ArrType (ArrType' (t1'', e'', t2'')) <- t2 =
-            ArrType (ArrType' (t1' `join` t1'', e' `meet` e'', t2' `join` t2''))
+            ArrType (ArrType' (t1' `join` t1'', e' `meet` e'', t2' `meet` t2''))
         | otherwise = BotType
 
-instance SubType ExpType where
+instance (Show e) => Show (ValType e) where
+    show x = case x of
+        NatType -> "Nat"
+        BoolType -> "Bool"
+        ArrType (ArrType' (t, e, t')) -> show t ++ " ->" ++ show e ++ " " ++ show t'
+        BotType -> "Bot"
+        TopType -> "Top"
+
+newtype ExpType e = ExpType ((ValType e), e)
+
+instance (PartialOrd e) => PartialOrd (ExpType e) where
     (ExpType (t, e)) <: (ExpType (t', e')) = t <: t' && e <: e'
+
+instance (Lattice e) => Lattice (ExpType e) where
     join (ExpType (t, e)) (ExpType (t', e')) = ExpType (t `join` t', e `join` e')
-    meet (ExpType (t, e)) (ExpType (t', e')) = ExpType (t `join` t', e `meet` e')
+    meet (ExpType (t, e)) (ExpType (t', e')) = ExpType (t `meet` t', e `meet` e')
 
-class (SubType a, Monoid a) => Effect a
+instance (Show e) => Show (ExpType e) where
+    show (ExpType (t, e)) = show t ++ "!" ++ show e
 
-newtype EffectType = EffectSet (Set String)
+newtype EffectSet s = EffectSet (Set s)
     deriving (Show, Eq)
 
-instance SubType EffectType where
+class (Lattice e, Monoid e) => Effect e
+
+instance (Ord s) => PartialOrd (EffectSet s) where
     (EffectSet e1) <: (EffectSet e2) = e1 `isSubsetOf` e2
+
+instance (Ord s) => Lattice (EffectSet s) where
     join (EffectSet e1) (EffectSet e2) = EffectSet $ e1 `union` e2
     meet (EffectSet e1) (EffectSet e2) = EffectSet $ e1 `intersection` e2
 
-instance Semigroup EffectType where
+instance (Ord s) => Semigroup (EffectSet s) where
     (EffectSet s1) <> (EffectSet s2) = EffectSet (s1 `union` s2)
 
-instance Monoid EffectType where
+instance (Ord s) => Monoid (EffectSet s) where
     mempty = EffectSet empty
     mappend = (<>)
 
-instance Effect EffectType
+instance (Ord s) => Effect (EffectSet s)

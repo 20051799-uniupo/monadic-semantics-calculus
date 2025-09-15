@@ -24,14 +24,14 @@ import Types (ValType(ArrType), ArrType'(..))
 
 type Identifier = String
 
-data Val sig where
-    NatVal :: (Nat n, Show n) => n -> Val sig
-    BoolVal :: Bool -> Val sig
-    LamVal :: Identifier -> ValType -> Exp sig -> Val sig
-    RecLamVal :: Identifier -> ArrType' -> Identifier -> Exp sig -> Val sig
-    IdentifierVal :: Identifier -> Val sig
+data Val sig e where
+    NatVal :: (Nat n, Show n) => n -> Val sig e
+    BoolVal :: Bool -> Val sig e
+    LamVal :: Identifier -> ValType e -> Exp sig e -> Val sig e
+    RecLamVal :: Identifier -> ArrType' e -> Identifier -> Exp sig e -> Val sig e
+    IdentifierVal :: Identifier -> Val sig e
 
-instance Show sig => Show (Val sig) where
+instance (Show sig, Show e) => Show (Val sig e) where
     show v = case v of
         NatVal n -> show n
         BoolVal b -> show b
@@ -41,18 +41,18 @@ instance Show sig => Show (Val sig) where
 
 data Mode = Continue | Stop
 
-data Clause sig = Clause
+data Clause sig e = Clause
     { clauseMode :: Mode
     , clauseParams :: [Identifier]
-    , clauseBody :: Exp sig
+    , clauseBody :: Exp sig e
     }
 
-data Handler sig = Handler
-    { handlerClauses :: Map sig (Clause sig)
-    , handlerFinal :: (Identifier, Exp sig)
+data Handler sig e = Handler
+    { handlerClauses :: Map sig (Clause sig e)
+    , handlerFinal :: (Identifier, Exp sig e)
     }
 
-instance (Show sig) => Show (Handler sig) where
+instance (Show sig, Show e) => Show (Handler sig e) where
     show (Handler cs (x, e)) =
         "(("
         ++ intercalate ", " [showClause op c | (op, c) <- Map.toList cs]
@@ -66,7 +66,7 @@ instance (Show sig) => Show (Handler sig) where
         arrowMode Continue = "c"
         arrowMode Stop     = "s"
 
-substHandler :: Identifier -> Val sig -> Handler sig -> Handler sig
+substHandler :: Identifier -> Val sig e -> Handler sig e -> Handler sig e
 substHandler varName val (Handler clauses (finalVar, finalBody)) =
     let newClauses = substClause varName val <$> clauses
         newFinalBody =
@@ -75,7 +75,7 @@ substHandler varName val (Handler clauses (finalVar, finalBody)) =
                 else subst varName val finalBody
      in Handler newClauses (finalVar, newFinalBody)
 
-substClause :: Identifier -> Val sig -> Clause sig -> Clause sig
+substClause :: Identifier -> Val sig e -> Clause sig e -> Clause sig e
 substClause varName val (Clause mode params body) =
     let newBody =
             if varName `elem` params
@@ -83,22 +83,22 @@ substClause varName val (Clause mode params body) =
                 else subst varName val body
      in Clause mode params newBody
 
-data Exp sig
-    = App (Val sig) (Val sig)
-    | Ret (Val sig)
-    | Do Identifier (Exp sig) (Exp sig)
-    | Magic sig [Val sig]
-    | HandleWith (Exp sig) (Handler sig)
-    | If (Val sig) (Exp sig) (Exp sig)
-    | Plus (Val sig) (Val sig)
-    | Minus (Val sig) (Val sig)
-    | And (Val sig) (Val sig)
-    | Or (Val sig) (Val sig)
-    | IsZero (Val sig)
-    | Suc (Val sig)
-    | Pred (Val sig)
+data Exp sig e
+    = App (Val sig e) (Val sig e)
+    | Ret (Val sig e)
+    | Do Identifier (Exp sig e) (Exp sig e)
+    | Magic sig [Val sig e]
+    | HandleWith (Exp sig e) (Handler sig e)
+    | If (Val sig e) (Exp sig e) (Exp sig e)
+    | Plus (Val sig e) (Val sig e)
+    | Minus (Val sig e) (Val sig e)
+    | And (Val sig e) (Val sig e)
+    | Or (Val sig e) (Val sig e)
+    | IsZero (Val sig e)
+    | Suc (Val sig e)
+    | Pred (Val sig e)
 
-instance (Show sig) => Show (Exp sig) where
+instance (Show sig, Show e) => Show (Exp sig e) where
     show e =
         "("
             ++ ( case e of
@@ -118,7 +118,7 @@ instance (Show sig) => Show (Exp sig) where
                )
             ++ ")"
 
-substVal :: Identifier -> Val sig -> Val sig -> Val sig
+substVal :: Identifier -> Val sig e -> Val sig e -> Val sig e
 substVal varName val (IdentifierVal x) | x == varName = val
 substVal varName val (LamVal x t body)
     | x == varName = LamVal x t body
@@ -128,7 +128,7 @@ substVal varName val v@(RecLamVal f t x body)
     | otherwise = RecLamVal f t x (subst varName val body)
 substVal _ _ v = v
 
-subst :: Identifier -> Val sig -> Exp sig -> Exp sig
+subst :: Identifier -> Val sig e -> Exp sig e -> Exp sig e
 subst varName val e = case e of
     App v1 v2 -> App (substVal varName val v1) (substVal varName val v2)
     Ret v -> Ret (substVal varName val v)
@@ -147,16 +147,16 @@ subst varName val e = case e of
     Suc (n) -> Suc (substVal varName val n)
     Pred (n) -> Pred (substVal varName val n)
 
-substs :: [(Identifier, Val sig)] -> Exp sig -> Exp sig
+substs :: [(Identifier, Val sig e)] -> Exp sig e -> Exp sig e
 substs substitutions expr = foldr (\(var, val) e -> subst var val e) expr substitutions
 
 class Sig s where
-    arity :: s -> ([ValType], ValType)
+    arity :: s -> ([ValType e], ValType e)
 
 class (Monad m, Sig sig) => MonSem m sig where
-    run :: sig -> [Val sig] -> m (Val sig)
+    run :: sig -> [Val sig e] -> m (Val sig e)
 
-reducePure :: (Ord sig) => Exp sig -> Maybe (Exp sig)
+reducePure :: (Ord sig) => Exp sig e -> Maybe (Exp sig e)
 reducePure e = case e of
     App (LamVal var _ body ) arg -> Just $ subst var arg body
     App v@(RecLamVal f _ x body) arg -> Just $ (subst f v . subst x arg) body
@@ -187,7 +187,7 @@ reducePure e = case e of
     HandleWith e1 h -> HandleWith <$> reducePure e1 <*> pure h
     _ -> Nothing
 
-reduce :: (MonSem m sig, Ord sig) => Exp sig -> Maybe (m (Exp sig))
+reduce :: (MonSem m sig, Ord sig) => Exp sig e -> Maybe (m (Exp sig e))
 reduce e =
     case reducePure e of
         Just e' -> Just (pure e')
