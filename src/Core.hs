@@ -12,7 +12,6 @@ where
 import Language
 
 data Res sig e = Ok (Val sig e) | Wr deriving (Show)
-
 data Conf sig e = ExpConf (Exp sig e) | ResConf (Res sig e) deriving (Show)
 
 reduceStep :: (MonSem m sig, Ord sig) => Conf sig e -> m (Conf sig e)

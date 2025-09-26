@@ -30,7 +30,7 @@ type Context e = Map.Map Identifier (ValType e)
 
 type Failable a e = Either (Error e) a
 
-typeOfVal :: (Sig sig, Effect e) => Val sig e -> Context e -> Failable (ValType e) e
+typeOfVal :: (Sig sig, Effect e sig) => Val sig e -> Context e -> Failable (ValType e) e
 typeOfVal v c = case v of
     NatVal _ -> pure NatType
     BoolVal _ -> pure BoolType
@@ -47,12 +47,12 @@ typeOfVal v c = case v of
         unless (t''e' <: ExpType (t', e)) $ Left $ ReturnTypeMismatch (ExpType (t', e)) t''e'
         pure $ ArrType r
 
-require :: (Sig sig, Effect e) => Val sig e -> ValType e -> Context e -> Failable () e
+require :: (Sig sig, Effect e sig) => Val sig e -> ValType e -> Context e -> Failable () e
 require x t c = do
     t' <- typeOfVal x c
     if (t <: t') then Right() else Left $ TypeMismatch t t'
 
-typeOfExp :: (Sig sig, Effect e) => Exp sig e -> Context e -> Failable (ExpType e) e
+typeOfExp :: (Sig sig, Effect e sig) => Exp sig e -> Context e -> Failable (ExpType e) e
 typeOfExp e c = case e of
     Ret v -> ExpType <$> (,mempty) <$> (typeOfVal v c)
     App f x -> do
@@ -107,5 +107,5 @@ typeOfExp e c = case e of
         ExpType (t', _effect) <- typeOfExp e' c'
         pure $ ExpType (t', mempty)
 
-typeOf :: (Sig sig, Effect e) => (Exp sig e) -> Failable (ExpType e) e
+typeOf :: (Sig sig, Effect e sig) => (Exp sig e) -> Failable (ExpType e) e
 typeOf e = typeOfExp e Map.empty

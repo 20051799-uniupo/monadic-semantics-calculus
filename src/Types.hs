@@ -61,7 +61,9 @@ instance (Show e) => Show (ExpType e) where
 newtype EffectSet s = EffectSet (Set s)
     deriving (Show, Eq)
 
-class (Lattice e, Monoid e) => Effect e
+class (Lattice e, Monoid e) => Effect e sig where
+    basic :: sig -> e
+    filter :: e -> (sig -> e) -> e
 
 instance (Ord s) => PartialOrd (EffectSet s) where
     (EffectSet e1) <: (EffectSet e2) = e1 `isSubsetOf` e2
@@ -77,4 +79,4 @@ instance (Ord s) => Monoid (EffectSet s) where
     mempty = EffectSet empty
     mappend = (<>)
 
-instance (Ord s) => Effect (EffectSet s)
+instance (Ord s) => Effect (EffectSet s) sig
