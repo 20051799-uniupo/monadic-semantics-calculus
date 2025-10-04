@@ -1,12 +1,15 @@
-module Types (ValType (..), EffectSet(..), ExpType (..), ArrType' (..), PartialOrd(..), Lattice(..), Effect) where
+module Types (ValType (..), EffectSet (..), ExpType (..), ArrType' (..), PartialOrd (..), Lattice (..), Effect(..)) where
 
-import Data.Set (Set, empty, intersection, isSubsetOf, union)
+import Data.Map (Map)
+import Data.Map qualified as Map
+import Data.Set (Set, intersection, isSubsetOf, singleton, union)
+import Data.Set qualified as Set
 
 class PartialOrd a where
     (<:) :: a -> a -> Bool
     infix 4 <:
 
-class PartialOrd a => Lattice a where
+class (PartialOrd a) => Lattice a where
     join :: a -> a -> a
     meet :: a -> a -> a
 
@@ -63,7 +66,7 @@ newtype EffectSet s = EffectSet (Set s)
 
 class (Lattice e, Monoid e) => Effect e sig where
     basic :: sig -> e
-    filter :: e -> (sig -> e) -> e
+    filter :: e -> Map sig e -> e
 
 instance (Ord s) => PartialOrd (EffectSet s) where
     (EffectSet e1) <: (EffectSet e2) = e1 `isSubsetOf` e2
@@ -76,7 +79,10 @@ instance (Ord s) => Semigroup (EffectSet s) where
     (EffectSet s1) <> (EffectSet s2) = EffectSet (s1 `union` s2)
 
 instance (Ord s) => Monoid (EffectSet s) where
-    mempty = EffectSet empty
+    mempty = EffectSet Set.empty
     mappend = (<>)
 
-instance (Ord s) => Effect (EffectSet s) sig
+instance (Ord sig) => Effect (EffectSet sig) sig where
+    basic op = EffectSet (singleton op)
+    filter (EffectSet e) cs = mconcat (map filter' (Set.toList e)) where
+        filter' op = Map.findWithDefault (basic op) op cs

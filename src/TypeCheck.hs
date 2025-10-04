@@ -1,21 +1,24 @@
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
+
 module TypeCheck (
     ValType,
     typeOf,
 ) where
 
-import Types (ValType(..), ExpType (..), ArrType' (..), PartialOrd(..), Lattice(..), Effect)
+import Types (ArrType' (..), Effect (..), ExpType (..), Lattice (..), PartialOrd (..), ValType (..))
 
 import Language (
     Exp (..),
+    Handler (..),
     Identifier,
-    Val (..),
     Sig,
-    Handler(..),
+    Val (..),
     arity,
  )
 
-import Control.Monad (unless, forM_, when)
+import Control.Monad (forM_, unless, when)
 import Data.Map qualified as Map
+import Prelude hiding (filter)
 
 data Error e
     = UnboundVariable Identifier
@@ -41,7 +44,7 @@ typeOfVal v c = case v of
         let c' = Map.insert x t c
         ExpType (t', e) <- typeOfExp b c'
         pure $ ArrType (ArrType' (t, e, t'))
-    RecLamVal f r@(ArrType' (t, e, t')) x b  -> do
+    RecLamVal f r@(ArrType' (t, e, t')) x b -> do
         let c' = Map.insert f (ArrType r) (Map.insert x t c)
         t''e' <- typeOfExp b c'
         unless (t''e' <: ExpType (t', e)) $ Left $ ReturnTypeMismatch (ExpType (t', e)) t''e'
@@ -50,7 +53,7 @@ typeOfVal v c = case v of
 require :: (Sig sig, Effect e sig) => Val sig e -> ValType e -> Context e -> Failable () e
 require x t c = do
     t' <- typeOfVal x c
-    if (t <: t') then Right() else Left $ TypeMismatch t t'
+    if (t <: t') then Right () else Left $ TypeMismatch t t'
 
 typeOfExp :: (Sig sig, Effect e sig) => Exp sig e -> Context e -> Failable (ExpType e) e
 typeOfExp e c = case e of
@@ -92,20 +95,22 @@ typeOfExp e c = case e of
         require a NatType c
         pure $ ExpType (NatType, mempty)
     Do x e1 e2 -> do
-        ExpType (t1, _effect) <- typeOfExp e1 c
+        ExpType (t1, ef1) <- typeOfExp e1 c
         let c' = Map.insert x t1 c
-        typeOfExp e2 c'
+        ExpType (t2, ef2) <- typeOfExp e2 c'
+        pure $ ExpType (t2, ef1 <> ef2)
     Magic op vs -> do
         let (vsTypes, t) = arity op
         when (length vs /= length vsTypes) $ Left $ ArityMismatch (length vs) (length vsTypes)
         forM_ (zip vs vsTypes) $ \(v, vType) -> do
             require v vType c
-        pure $ ExpType (t, mempty)
-    HandleWith e1 (Handler _ (x, e')) -> do
-        ExpType (t, _effect) <- typeOfExp e1 c
+        pure $ ExpType (t, basic op)
+    HandleWith e (Handler _ (x, e')) -> do
+        ExpType (t, ef) <- typeOfExp e c
+        let clausesEffects = Map.empty
         let c' = Map.insert x t c
-        ExpType (t', _effect) <- typeOfExp e' c'
-        pure $ ExpType (t', mempty)
+        ExpType (t', ef') <- typeOfExp e' c'
+        pure $ ExpType (t', (filter ef clausesEffects) <> ef')
 
 typeOf :: (Sig sig, Effect e sig) => (Exp sig e) -> Failable (ExpType e) e
 typeOf e = typeOfExp e Map.empty
