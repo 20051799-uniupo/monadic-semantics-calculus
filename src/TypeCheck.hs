@@ -13,11 +13,14 @@ import Language (
     Identifier,
     Sig,
     Val (..),
+    Clause (..),
+    Mode (..),
     arity,
  )
 
 import Control.Monad (forM_, unless, when)
 import Data.Map qualified as Map
+import Data.Set qualified as Set
 import Prelude hiding (filter)
 
 data Error e
@@ -49,6 +52,17 @@ typeOfVal v c = case v of
         t''e' <- typeOfExp b c'
         unless (t''e' <: ExpType (t', e)) $ Left $ ReturnTypeMismatch (ExpType (t', e)) t''e'
         pure $ ArrType r
+
+typeOfClause :: (Sig sig, Effect e sig) => sig -> Clause sig e -> Context e -> Failable (ExpType e) e
+typeOfClause op clause ctx = do
+    let (paramTypes, _) = arity op
+    let params = clauseParams clause
+    unless (length params == length paramTypes) $
+        Left $ ArityMismatch (length params) (length paramTypes)
+
+    let clauseCtx = Map.union (Map.fromList (zip params paramTypes)) ctx
+
+    typeOfExp (clauseBody clause) clauseCtx
 
 require :: (Sig sig, Effect e sig) => Val sig e -> ValType e -> Context e -> Failable () e
 require x t c = do
@@ -105,12 +119,25 @@ typeOfExp e c = case e of
         forM_ (zip vs vsTypes) $ \(v, vType) -> do
             require v vType c
         pure $ ExpType (t, basic op)
-    HandleWith e (Handler _ (x, e')) -> do
+    HandleWith e (Handler cs (x, e')) -> do
         ExpType (t, ef) <- typeOfExp e c
-        let clausesEffects = Map.empty
-        let c' = Map.insert x t c
-        ExpType (t', ef') <- typeOfExp e' c'
-        pure $ ExpType (t', (filter ef clausesEffects) <> ef')
+
+        ExpType (t', ef') <- typeOfExp e' (Map.insert x t c)
+
+        clauseFilters <- forM (Map.toList cs) $ \(op, clause) -> do
+            ExpType (t'', ef'') <- typeOfClause op clause c
+            case clauseMode clause of
+                Continue -> do
+                    let (_, t) = arity op
+                    unless (t'' <: t) $ Left $ TypeMismatch t t''
+                Stop -> unless (t'' <: t') $ Left $ TypeMismatch t' t''
+            pure (op, ClauseFilter (clauseMode clause) ef'')
+        
+        let h = Filter (Map.fromList clauseFilters) ef'
+
+        -- NOTE: should be T'' with T′ <: T ′′
+        -- could use annotations or join all stop return types?
+        pure $ ExpType (t', filter ef h)
 
 typeOf :: (Sig sig, Effect e sig) => (Exp sig e) -> Failable (ExpType e) e
 typeOf e = typeOfExp e Map.empty
