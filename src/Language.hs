@@ -1,5 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Language (
     Identifier,
@@ -9,18 +9,18 @@ module Language (
     Sig (..),
     Handler (..),
     Clause (..),
-    Mode (..),
     subst,
     reduce,
 )
 where
 
-import Data.Map (Map)
-import qualified Data.Map as Map
 import Data.List (intercalate)
+import Data.Map (Map)
+import Data.Map qualified as Map
 
-import Nat (Nat(..))
-import Types (ValType(ArrType), ArrType'(..))
+import Nat (Nat (..))
+import Types (ArrType' (..), ValType (ArrType))
+import Types (Mode(..))
 
 type Identifier = String
 
@@ -39,8 +39,6 @@ instance (Show sig, Show e) => Show (Val sig e) where
         RecLamVal f t x b -> "rec " ++ f ++ ": " ++ show (ArrType t) ++ "." ++ x ++ "." ++ show b
         IdentifierVal x -> x
 
-data Mode = Continue | Stop
-
 data Clause sig e = Clause
     { clauseMode :: Mode
     , clauseParams :: [Identifier]
@@ -55,16 +53,18 @@ data Handler sig e = Handler
 instance (Show sig, Show e) => Show (Handler sig e) where
     show (Handler cs (x, e)) =
         "(("
-        ++ intercalate ", " [showClause op c | (op, c) <- Map.toList cs]
-        ++ "), "
-        ++ x ++ "->" ++ show e
-        ++ ")"
+            ++ intercalate ", " [showClause op c | (op, c) <- Map.toList cs]
+            ++ "), "
+            ++ x
+            ++ "->"
+            ++ show e
+            ++ ")"
       where
         showClause op (Clause m p b) =
             show op ++ show p ++ "(->" ++ arrowMode m ++ ")" ++ show b
 
         arrowMode Continue = "c"
-        arrowMode Stop     = "s"
+        arrowMode Stop = "s"
 
 substHandler :: Identifier -> Val sig e -> Handler sig e -> Handler sig e
 substHandler varName val (Handler clauses (finalVar, finalBody)) =
@@ -158,20 +158,20 @@ class (Monad m, Sig sig) => MonSem m sig where
 
 reducePure :: (Ord sig) => Exp sig e -> Maybe (Exp sig e)
 reducePure e = case e of
-    App (LamVal var _ body ) arg -> Just $ subst var arg body
+    App (LamVal var _ body) arg -> Just $ subst var arg body
     App v@(RecLamVal f _ x body) arg -> Just $ (subst f v . subst x arg) body
     If (BoolVal True) bThen _ -> Just bThen
     If (BoolVal False) _ bElse -> Just bElse
     Plus (NatVal a) (NatVal b) -> Just $ Ret $ NatVal $ f a b
-        where
-            f x y
-                | isZero x = y
-                | otherwise = succ $ f x (pred y)
+      where
+        f x y
+            | isZero x = y
+            | otherwise = succ $ f x (pred y)
     Minus (NatVal a) (NatVal b) -> Just $ Ret $ NatVal $ f a b
-        where
-            f x y
-                | isZero y = x
-                | otherwise = f (pred x) (pred y)
+      where
+        f x y
+            | isZero y = x
+            | otherwise = f (pred x) (pred y)
     And (BoolVal a) (BoolVal b) -> Just $ Ret $ BoolVal (a && b)
     Or (BoolVal a) (BoolVal b) -> Just $ Ret $ BoolVal (a || b)
     IsZero (NatVal n) -> Just $ Ret $ BoolVal $ isZero n

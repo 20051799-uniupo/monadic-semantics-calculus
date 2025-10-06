@@ -1,4 +1,4 @@
-module Types (ValType (..), EffectSet (..), ExpType (..), ArrType' (..), PartialOrd (..), Lattice (..), Effect(..)) where
+module Types (ValType (..), EffectSet (..), ExpType (..), ArrType' (..), PartialOrd (..), Lattice (..), Effect (..), Mode (..), ClauseFilter (..), Filter (..)) where
 
 import Data.Map (Map)
 import Data.Map qualified as Map
@@ -61,12 +61,24 @@ instance (Lattice e) => Lattice (ExpType e) where
 instance (Show e) => Show (ExpType e) where
     show (ExpType (t, e)) = show t ++ "!" ++ show e
 
-newtype EffectSet s = EffectSet (Set s)
-    deriving (Show, Eq)
+data Mode = Continue | Stop
+
+data ClauseFilter sig e = ClauseFilter
+    { clauseFilterMode :: Mode
+    , clauseFilterEffect :: e
+    }
+
+data Filter sig e = Filter
+    { filterClauses :: Map sig (ClauseFilter sig e)
+    , filterEffect :: e
+    }
 
 class (Lattice e, Monoid e) => Effect e sig where
     basic :: sig -> e
-    filter :: e -> Map sig e -> e
+    filter :: e -> Filter sig e -> e
+
+newtype EffectSet s = EffectSet (Set s)
+    deriving (Show, Eq)
 
 instance (Ord s) => PartialOrd (EffectSet s) where
     (EffectSet e1) <: (EffectSet e2) = e1 `isSubsetOf` e2
@@ -84,5 +96,21 @@ instance (Ord s) => Monoid (EffectSet s) where
 
 instance (Ord sig) => Effect (EffectSet sig) sig where
     basic op = EffectSet (singleton op)
-    filter (EffectSet e) cs = mconcat (map filter' (Set.toList e)) where
-        filter' op = Map.findWithDefault (basic op) op cs
+    filter (EffectSet e) h =
+        let
+            cs = filterClauses h
+            (EffectSet ef) = filterEffect h
+         in
+            EffectSet $
+                Set.foldl'
+                    ( \currentPossibleEffects op ->
+                        case Map.lookup op cs of
+                            Nothing ->
+                                Set.insert op currentPossibleEffects
+                            Just (ClauseFilter Continue (EffectSet clauseEff)) ->
+                                currentPossibleEffects `union` clauseEff
+                            Just (ClauseFilter Stop (EffectSet clauseEff)) ->
+                                currentPossibleEffects `union` clauseEff
+                    )
+                    ef
+                    e

@@ -5,22 +5,20 @@ module TypeCheck (
     typeOf,
 ) where
 
-import Types (ArrType' (..), Effect (..), ExpType (..), Lattice (..), PartialOrd (..), ValType (..))
+import Types (ArrType' (..), ClauseFilter (..), Effect (..), ExpType (..), Filter (..), Lattice (..), Mode (..), PartialOrd (..), ValType (..))
 
 import Language (
+    Clause (..),
     Exp (..),
     Handler (..),
     Identifier,
     Sig,
     Val (..),
-    Clause (..),
-    Mode (..),
     arity,
  )
 
-import Control.Monad (forM_, unless, when)
+import Control.Monad (forM, forM_, unless, when)
 import Data.Map qualified as Map
-import Data.Set qualified as Set
 import Prelude hiding (filter)
 
 data Error e
@@ -36,7 +34,7 @@ type Context e = Map.Map Identifier (ValType e)
 
 type Failable a e = Either (Error e) a
 
-typeOfVal :: (Sig sig, Effect e sig) => Val sig e -> Context e -> Failable (ValType e) e
+typeOfVal :: (Sig sig, Ord sig, Effect e sig) => Val sig e -> Context e -> Failable (ValType e) e
 typeOfVal v c = case v of
     NatVal _ -> pure NatType
     BoolVal _ -> pure BoolType
@@ -53,23 +51,24 @@ typeOfVal v c = case v of
         unless (t''e' <: ExpType (t', e)) $ Left $ ReturnTypeMismatch (ExpType (t', e)) t''e'
         pure $ ArrType r
 
-typeOfClause :: (Sig sig, Effect e sig) => sig -> Clause sig e -> Context e -> Failable (ExpType e) e
+typeOfClause :: (Sig sig, Ord sig, Effect e sig) => sig -> Clause sig e -> Context e -> Failable (ExpType e) e
 typeOfClause op clause ctx = do
     let (paramTypes, _) = arity op
     let params = clauseParams clause
     unless (length params == length paramTypes) $
-        Left $ ArityMismatch (length params) (length paramTypes)
+        Left $
+            ArityMismatch (length params) (length paramTypes)
 
     let clauseCtx = Map.union (Map.fromList (zip params paramTypes)) ctx
 
     typeOfExp (clauseBody clause) clauseCtx
 
-require :: (Sig sig, Effect e sig) => Val sig e -> ValType e -> Context e -> Failable () e
+require :: (Sig sig, Ord sig, Effect e sig) => Val sig e -> ValType e -> Context e -> Failable () e
 require x t c = do
     t' <- typeOfVal x c
     if (t <: t') then Right () else Left $ TypeMismatch t t'
 
-typeOfExp :: (Sig sig, Effect e sig) => Exp sig e -> Context e -> Failable (ExpType e) e
+typeOfExp :: (Sig sig, Ord sig, Effect e sig) => Exp sig e -> Context e -> Failable (ExpType e) e
 typeOfExp e c = case e of
     Ret v -> ExpType <$> (,mempty) <$> (typeOfVal v c)
     App f x -> do
@@ -132,12 +131,12 @@ typeOfExp e c = case e of
                     unless (t'' <: t) $ Left $ TypeMismatch t t''
                 Stop -> unless (t'' <: t') $ Left $ TypeMismatch t' t''
             pure (op, ClauseFilter (clauseMode clause) ef'')
-        
+
         let h = Filter (Map.fromList clauseFilters) ef'
 
         -- NOTE: should be T'' with T′ <: T ′′
         -- could use annotations or join all stop return types?
         pure $ ExpType (t', filter ef h)
 
-typeOf :: (Sig sig, Effect e sig) => (Exp sig e) -> Failable (ExpType e) e
+typeOf :: (Sig sig, Ord sig, Effect e sig) => (Exp sig e) -> Failable (ExpType e) e
 typeOf e = typeOfExp e Map.empty
