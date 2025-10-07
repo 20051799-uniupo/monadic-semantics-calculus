@@ -99,18 +99,18 @@ instance (Ord sig) => Effect (EffectSet sig) sig where
     filter (EffectSet e) h =
         let
             cs = filterClauses h
-            (EffectSet ef) = filterEffect h
+            (EffectSet finalEf) = filterEffect h
          in
             EffectSet $
                 Set.foldl'
-                    ( \currentPossibleEffects op ->
+                    ( \accEf op ->
                         case Map.lookup op cs of
                             Nothing ->
-                                Set.insert op currentPossibleEffects
-                            Just (ClauseFilter Continue (EffectSet clauseEff)) ->
-                                currentPossibleEffects `union` clauseEff
-                            Just (ClauseFilter Stop (EffectSet clauseEff)) ->
-                                currentPossibleEffects `union` clauseEff
+                                Set.insert op accEf
+                            Just (ClauseFilter Continue (EffectSet cEf)) ->
+                                accEf `union` cEf
+                            Just (ClauseFilter Stop (EffectSet cEf)) ->
+                                accEf `union` cEf
                     )
-                    ef
+                    finalEf
                     e
