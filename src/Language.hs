@@ -22,6 +22,8 @@ import Nat (Nat (..))
 import Types (ArrType' (..), ValType (ArrType))
 import Types (Mode(..))
 
+import Core(Valuable(..), Reducible(..))
+
 type Identifier = String
 
 data Val sig e where
@@ -187,17 +189,22 @@ reducePure e = case e of
     HandleWith e1 h -> HandleWith <$> reducePure e1 <*> pure h
     _ -> Nothing
 
-reduce :: (MonSem m sig, Ord sig) => Exp sig e -> Maybe (m (Exp sig e))
-reduce e =
-    case reducePure e of
-        Just e' -> Just (pure e')
-        Nothing ->
-            case e of
-                Magic op vs -> Just $ Ret <$> run op vs -- EFFECT
-                Do var (Ret val) e2 -> Just $ pure $ subst var val e2 -- RET
-                Do var e1 e2 ->
-                    -- DO
-                    case reduce e1 of
-                        Just m_e1' -> Just $ (\e1' -> Do var e1' e2) <$> m_e1'
-                        Nothing -> Nothing
-                _ -> Nothing
+instance Valuable (Exp sig e) (Val sig e) where
+    toVal e = case e of
+        Ret v -> Just v
+        _ -> Nothing
+
+instance (MonSem m sig, Ord sig) => Reducible m (Exp sig e) (Val sig e) where
+    reduce e =
+        case reducePure e of
+            Just e' -> Just (pure e')
+            Nothing ->
+                case e of
+                    Magic op vs -> Just $ Ret <$> run op vs -- EFFECT
+                    Do var (Ret val) e2 -> Just $ pure $ subst var val e2 -- RET
+                    Do var e1 e2 ->
+                        -- DO
+                        case reduce e1 of
+                            Just m_e1' -> Just $ (\e1' -> Do var e1' e2) <$> m_e1'
+                            Nothing -> Nothing
+                    _ -> Nothing
