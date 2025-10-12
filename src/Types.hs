@@ -61,7 +61,7 @@ instance (Lattice e) => Lattice (ExpType e) where
 instance (Show e) => Show (ExpType e) where
     show (ExpType (t, e)) = show t ++ "!" ++ show e
 
-data Mode = Continue | Stop
+data Mode = Continue | Stop deriving (Eq)
 
 data ClauseFilter sig e = ClauseFilter
     { clauseFilterMode :: Mode
@@ -75,7 +75,8 @@ data Filter sig e = Filter
 
 class (Lattice e, Monoid e) => Effect e sig where
     basic :: sig -> e
-    filter :: e -> Filter sig e -> e
+    opsIn :: e -> Set sig
+    applyFilter :: e -> Filter sig e -> e
 
 newtype EffectSet s = EffectSet (Set s)
     deriving (Show, Eq)
@@ -96,21 +97,15 @@ instance (Ord s) => Monoid (EffectSet s) where
 
 instance (Ord sig) => Effect (EffectSet sig) sig where
     basic op = EffectSet (singleton op)
-    filter (EffectSet e) h =
+    opsIn (EffectSet e) = e
+    applyFilter (EffectSet e) h =
         let
             cs = filterClauses h
-            (EffectSet finalEf) = filterEffect h
-         in
-            EffectSet $
-                Set.foldl'
-                    ( \accEf op ->
-                        case Map.lookup op cs of
-                            Nothing ->
-                                Set.insert op accEf
-                            Just (ClauseFilter Continue (EffectSet cEf)) ->
-                                accEf `union` cEf
-                            Just (ClauseFilter Stop (EffectSet cEf)) ->
-                                accEf `union` cEf
-                    )
-                    finalEf
-                    e
+            (EffectSet e') = filterEffect h
+            flat op = case Map.lookup op cs of
+                Nothing ->
+                    Set.singleton op
+                Just (ClauseFilter _ (EffectSet cEf)) ->
+                    cEf
+        in
+            EffectSet (e' `union` foldMap flat e)
