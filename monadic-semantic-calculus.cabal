@@ -37,8 +37,6 @@ library
   build-depends:
       base >=4.7 && <5
     , containers
-    , hspec
-    , megaparsec
     , mtl
   default-language: Haskell2010
 
@@ -56,8 +54,6 @@ executable monadic-semantic-calculus-exe
   build-depends:
       base >=4.7 && <5
     , containers
-    , hspec
-    , megaparsec
     , monadic-semantic-calculus
     , mtl
   default-language: Haskell2010
@@ -77,8 +73,6 @@ test-suite monadic-semantic-calculus-test
   build-depends:
       base >=4.7 && <5
     , containers
-    , hspec
-    , megaparsec
     , monadic-semantic-calculus
     , mtl
   default-language: Haskell2010

@@ -21,8 +21,6 @@ extra-source-files:
 
 dependencies:
 - base >= 4.7 && < 5
-- megaparsec
-- hspec
 - containers
 - mtl
 

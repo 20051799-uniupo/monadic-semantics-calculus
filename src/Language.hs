@@ -1,6 +1,12 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
+{- |
+Module      : Language
+Description : Syntax and operational semantics of \( \Lambda_\Sigma \).
+
+Syntax and operational semantics of \( \Lambda_\Sigma \).
+-}
 module Language (
     Identifier,
     Val (..),
@@ -9,8 +15,6 @@ module Language (
     Sig (..),
     Handler (..),
     Clause (..),
-    subst,
-    reduce,
 )
 where
 
@@ -19,18 +23,24 @@ import Data.Map (Map)
 import Data.Map qualified as Map
 
 import Nat (Nat (..))
-import Types (ArrType' (..), ValType (ArrType))
-import Types (Mode(..))
+import Types (ArrType' (..), Mode (..), ValType (ArrType))
 
-import Core(Valuable(..), Reducible(..))
+import Core (Reducible (..), Valuable (..))
 
+-- | Identifiers are represented as strings.
 type Identifier = String
 
+-- | The set of values \( \mathbf{Val} \).
 data Val sig e where
+    -- | Natural number values (generic over representation \( \mathbb{N} \)).
     NatVal :: (Nat n, Show n) => n -> Val sig e
+    -- | Boolean values.
     BoolVal :: Bool -> Val sig e
+    -- | Lambda abstraction \( \lambda x. e \).
     LamVal :: Identifier -> ValType e -> Exp sig e -> Val sig e
+    -- | Recursive function \( \text{rec } f. \lambda x. e \).
     RecLamVal :: Identifier -> ArrType' e -> Identifier -> Exp sig e -> Val sig e
+    -- | Variables (only used during substitution, technically not closed values).
     IdentifierVal :: Identifier -> Val sig e
 
 instance (Show sig, Show e) => Show (Val sig e) where
@@ -41,15 +51,30 @@ instance (Show sig, Show e) => Show (Val sig e) where
         RecLamVal f t x b -> "rec " ++ f ++ ": " ++ show (ArrType t) ++ "." ++ x ++ "." ++ show b
         IdentifierVal x -> x
 
+{- | A handler clause for a specific operation.
+
+Corresponds to \( op(\bar{x}) \to_\mu e \).
+-}
 data Clause sig e = Clause
     { clauseMode :: Mode
+    -- ^ The mode \( \mu \).
     , clauseParams :: [Identifier]
+    -- ^ The parameters bound to the operation arguments.
     , clauseBody :: Exp sig e
+    -- ^ The body of the clause expression.
     }
 
+{- | A handler definition \( h \):
+
+\[
+h ::= \overline{c}, x \mapsto e
+\]
+-}
 data Handler sig e = Handler
     { handlerClauses :: Map sig (Clause sig e)
+    -- ^ The map of operation clauses \( \overline{c} \).
     , handlerFinal :: (Identifier, Exp sig e)
+    -- ^ The final return clause \( x \mapsto e \).
     }
 
 instance (Show sig, Show e) => Show (Handler sig e) where
@@ -68,6 +93,10 @@ instance (Show sig, Show e) => Show (Handler sig e) where
         arrowMode Continue = "c"
         arrowMode Stop = "s"
 
+{- | Performs substitution in a handler definition.
+
+Used when reducing \( \text{handle } e \text{ with } h \).
+-}
 substHandler :: Identifier -> Val sig e -> Handler sig e -> Handler sig e
 substHandler varName val (Handler clauses (finalVar, finalBody)) =
     let newClauses = substClause varName val <$> clauses
@@ -77,6 +106,7 @@ substHandler varName val (Handler clauses (finalVar, finalBody)) =
                 else subst varName val finalBody
      in Handler newClauses (finalVar, newFinalBody)
 
+-- | Performs substitution in a single clause.
 substClause :: Identifier -> Val sig e -> Clause sig e -> Clause sig e
 substClause varName val (Clause mode params body) =
     let newBody =
@@ -85,20 +115,37 @@ substClause varName val (Clause mode params body) =
                 else subst varName val body
      in Clause mode params newBody
 
+{- | The set of expressions \( \mathbf{Exp} \).
+
+Corresponds to Figure 2 and Figure 7.
+-}
 data Exp sig e
-    = App (Val sig e) (Val sig e)
-    | Ret (Val sig e)
-    | Do Identifier (Exp sig e) (Exp sig e)
-    | Magic sig [Val sig e]
-    | HandleWith (Exp sig e) (Handler sig e)
-    | If (Val sig e) (Exp sig e) (Exp sig e)
-    | Plus (Val sig e) (Val sig e)
-    | Minus (Val sig e) (Val sig e)
-    | And (Val sig e) (Val sig e)
-    | Or (Val sig e) (Val sig e)
-    | IsZero (Val sig e)
-    | Suc (Val sig e)
-    | Pred (Val sig e)
+    = -- | Function application \( v_1 \ v_2 \).
+      App (Val sig e) (Val sig e)
+    | -- | Injection of values into expressions \( \text{return } v \).
+      Ret (Val sig e)
+    | -- | Monadic bind \( \text{do } x = e_1; e_2 \).
+      Do Identifier (Exp sig e) (Exp sig e)
+    | -- | Operation call \( op(\overline{v}) \).
+      Magic sig [Val sig e]
+    | -- | Handler application \( \text{handle } e \text{ with } h \).
+      HandleWith (Exp sig e) (Handler sig e)
+    | -- | Conditional \( \text{if } v \text{ then } e_1 \text{ else } e_2 \).
+      If (Val sig e) (Exp sig e) (Exp sig e)
+    | -- | Addition (primitive).
+      Plus (Val sig e) (Val sig e)
+    | -- | Subtraction (primitive).
+      Minus (Val sig e) (Val sig e)
+    | -- | Boolean AND (primitive).
+      And (Val sig e) (Val sig e)
+    | -- | Boolean OR (primitive).
+      Or (Val sig e) (Val sig e)
+    | -- | Zero test (primitive).
+      IsZero (Val sig e)
+    | -- | Successor (primitive).
+      Suc (Val sig e)
+    | -- | Predecessor (primitive).
+      Pred (Val sig e)
 
 instance (Show sig, Show e) => Show (Exp sig e) where
     show e =
@@ -120,6 +167,7 @@ instance (Show sig, Show e) => Show (Exp sig e) where
                )
             ++ ")"
 
+-- | Substitution on values: \( v[val/x] \).
 substVal :: Identifier -> Val sig e -> Val sig e -> Val sig e
 substVal varName val (IdentifierVal x) | x == varName = val
 substVal varName val (LamVal x t body)
@@ -130,6 +178,7 @@ substVal varName val v@(RecLamVal f t x body)
     | otherwise = RecLamVal f t x (subst varName val body)
 substVal _ _ v = v
 
+-- | Substitution on expressions: \( e[val/x] \).
 subst :: Identifier -> Val sig e -> Exp sig e -> Exp sig e
 subst varName val e = case e of
     App v1 v2 -> App (substVal varName val v1) (substVal varName val v2)
@@ -149,15 +198,38 @@ subst varName val e = case e of
     Suc (n) -> Suc (substVal varName val n)
     Pred (n) -> Pred (substVal varName val n)
 
+-- | Multiple simultaneous substitutions.
 substs :: [(Identifier, Val sig e)] -> Exp sig e -> Exp sig e
 substs substitutions expr = foldr (\(var, val) e -> subst var val e) expr substitutions
 
+{- | Abstract interface for operation signatures.
+
+Defines the arity and type of operations in the signature \( \Sigma \).
+-}
 class Sig s where
     arity :: s -> ([ValType e], ValType e)
 
+{- | Abstract interface for the monadic semantics of operations.
+
+This connects the syntactic operation calls to the underlying monad.
+-}
 class (Monad m, Sig sig) => MonSem m sig where
+    {- | The interpretation function \( \text{run}_{op} \).
+
+    Maps an operation and its arguments to a monadic computation.
+    -}
     run :: sig -> [Val sig e] -> m (Val sig e)
 
+{- | The "pure" reduction relation \( \to_p \).
+
+Combines the rules from Figure 3 (Pure Reduction) and Figure 8 (Handlers).
+
+Key Handler Rules:
+
+*   **WITH-DO**: \( \text{handle } (\text{do } y=e_1; e_2) \text{ with } h \to \text{handle } e_1 \text{ with } (\dots) \)
+*   **WITH-RET**: \( \text{handle } (\text{return } v) \text{ with } h \to \text{do } x = \text{return } v; e \)
+*   **WITH-OP**: Dispatches to the appropriate clause based on the operation and mode.
+-}
 reducePure :: (Ord sig) => Exp sig e -> Maybe (Exp sig e)
 reducePure e = case e of
     App (LamVal var _ body) arg -> Just $ subst var arg body
@@ -189,21 +261,34 @@ reducePure e = case e of
     HandleWith e1 h -> HandleWith <$> reducePure e1 <*> pure h
     _ -> Nothing
 
+{- | Implements the 'Valuable' interface for the language.
+
+Maps \( \text{Ret } v \) to \( \text{Just } v \).
+-}
 instance Valuable (Exp sig e) (Val sig e) where
     toVal e = case e of
         Ret v -> Just v
         _ -> Nothing
 
+{- | Implements the 'Reducible' interface for the language.
+
+This defines the monadic reduction \( \to \) (Figure 4).
+
+1.  __PURE__: If \( e \to_p e' \), then \( e \to \eta(e') \).
+2.  __EFFECT__: \( op(\overline{v}) \to \text{map }(\text{return } [\,]) \ \text{run}_{op}(\overline{v}) \).
+3.  __RET__: \( \text{do } x = \text{return } v; e \to \eta(e[v/x]) \).
+4.  __DO__: \( \text{do } x = e_1; e_2 \to \text{map }(\text{do } x = [\,]; e_2) \ e_1 \).
+-}
 instance (MonSem m sig, Ord sig) => Reducible m (Exp sig e) (Val sig e) where
     reduce e =
         case reducePure e of
             Just e' -> Just (pure e')
             Nothing ->
                 case e of
-                    Magic op vs -> Just $ Ret <$> run op vs -- EFFECT
-                    Do var (Ret val) e2 -> Just $ pure $ subst var val e2 -- RET
+                    Magic op vs -> Just $ Ret <$> run op vs -- Rule (EFFECT)
+                    Do var (Ret val) e2 -> Just $ pure $ subst var val e2 -- Rule (RET)
                     Do var e1 e2 ->
-                        -- DO
+                        -- Rule (DO)
                         case reduce e1 of
                             Just m_e1' -> Just $ (\e1' -> Do var e1' e2) <$> m_e1'
                             Nothing -> Nothing
