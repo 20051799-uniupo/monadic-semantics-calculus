@@ -5,7 +5,6 @@ import Data.Map (Map)
 import Data.Map qualified as Map
 import Data.Proxy
 import Data.Set qualified as Set
-import Data.Typeable
 import Data.Void
 import Text.Megaparsec
 import Text.Megaparsec.Char
@@ -30,7 +29,7 @@ semanticsRegistry =
         , (("Exceptions", "Exceptions"), Semantics (Proxy @(Either String)) (Proxy @(ExceptionSig String)))
         ]
 
-class (Sig sig, Ord sig, Show sig, Typeable sig) => ParsableSig sig where
+class (Sig sig, Ord sig, Show sig) => ParsableSig sig where
     pOp :: Parser sig
 
 data ParsedProgram
