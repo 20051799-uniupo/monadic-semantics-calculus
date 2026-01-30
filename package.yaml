@@ -23,6 +23,8 @@ dependencies:
 - base >= 4.7 && < 5
 - containers
 - mtl
+- megaparsec
+- optparse-applicative
 
 ghc-options:
 - -Wall
@@ -45,6 +47,7 @@ library:
     - Nat
     - TypeCheck
     - Types
+    - Parser
   default-extensions: GHC2021
 
 executables:
@@ -57,6 +60,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - monadic-semantic-calculus
+    - megaparsec
     default-extensions: GHC2021
 
 tests:

@@ -47,3 +47,7 @@ Uses the standard List monad @[]@ (equivalent to the monad \( \mathcal{L}(X) \) 
 instance MonSem [] NDSig where
     run Choose [] = [BoolVal True, BoolVal False]
     run Choose _ = undefined
+
+-- instance ParsableSig NDSig where
+--     bindOp "choose" = Just Choose
+--     bindOp _ = Nothing

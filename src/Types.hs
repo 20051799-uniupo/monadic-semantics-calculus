@@ -180,7 +180,10 @@ class (Lattice e, Monoid e) => Effect e sig where
 Here, an effect \\( E \\) is simply a subset of the signature \\( \\Sigma \\).
 -}
 newtype EffectSet s = EffectSet (Set s)
-    deriving (Show, Eq)
+    deriving (Eq)
+
+instance (Show s) => Show (EffectSet s) where
+    show (EffectSet e) = show $ Set.toList e
 
 -- | Subtyping is set inclusion: \\( E_1 \\subseteq E_2 \\).
 instance (Ord s) => PartialOrd (EffectSet s) where
