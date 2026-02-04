@@ -11,6 +11,7 @@ import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
 
 import Core (Res)
+import Data.Char (isAlphaNum, isLetter)
 import Effects.Exceptions (ExceptionSig (..))
 import Effects.Nondeterminism (NDSig (..))
 import Language
@@ -45,7 +46,7 @@ deriving instance Show ParsedProgram
 pWhole :: Parser ParsedProgram
 pWhole = do
     sc
-    void $ symbol "using"
+    void $ keyword "using"
     sigName <- identifier
     void $ symbol "@"
     mName <- identifier
@@ -65,6 +66,7 @@ pExp =
         <|> try (pHandle @sig)
         <|> try (pReturn @sig)
         <|> try (pOpCall @sig)
+        <|> try (pPrim @sig)
         <|> (pApp @sig)
 
 pOpCall :: forall sig. (ParsableSig sig) => Parser (Exp sig (EffectSet sig))
@@ -74,14 +76,14 @@ pOpCall = do
     pure $ Magic op args
 
 pVal :: forall sig. (ParsableSig sig) => Parser (Val sig (EffectSet sig))
-pVal = try pNat <|> pBool <|> pVar <|> (pLam @sig) <|> (pRecLam @sig) <|> parens (pVal @sig)
+pVal = try pNat <|> pBool <|> try (pLam @sig) <|> pVar <|> try (pRecLam @sig) <|> parens (pVal @sig)
 
 pReturn :: forall sig. (ParsableSig sig) => Parser (Exp sig (EffectSet sig))
-pReturn = symbol "return" >> Ret <$> pVal @sig
+pReturn = keyword "return" >> Ret <$> pVal @sig
 
 pDo :: forall sig. (ParsableSig sig) => Parser (Exp sig (EffectSet sig))
 pDo = do
-    void $ symbol "do"
+    void $ keyword "do"
     x <- identifier
     void $ symbol "="
     e1 <- pExp @sig
@@ -91,21 +93,42 @@ pDo = do
 
 pIf :: forall sig. (ParsableSig sig) => Parser (Exp sig (EffectSet sig))
 pIf = do
-    void $ symbol "if"
+    void $ keyword "if"
     cond <- pVal @sig
-    void $ symbol "then"
+    void $ keyword "then"
     e1 <- pExp @sig
-    void $ symbol "else"
+    void $ keyword "else"
     e2 <- pExp @sig
     pure $ If cond e1 e2
 
 pHandle :: forall sig. (ParsableSig sig) => Parser (Exp sig (EffectSet sig))
 pHandle = do
-    void $ symbol "handle"
+    void $ keyword "handle"
     e <- pExp @sig
-    void $ symbol "with"
+    void $ keyword "with"
     h <- pHandler @sig
     pure $ HandleWith e h
+
+pPrim :: forall sig. (ParsableSig sig) => Parser (Exp sig (EffectSet sig))
+pPrim = try pBinary <|> pUnary
+  where
+    pUnary = do
+        op <-
+            (keyword "succ" >> pure Suc)
+                <|> (keyword "pred" >> pure Pred)
+                <|> (keyword "iszero" >> pure IsZero)
+        v <- pVal @sig
+        pure $ op v
+
+    pBinary = do
+        v1 <- pVal @sig
+        op <-
+            (symbol "+" >> pure Plus)
+                <|> (symbol "-" >> pure Minus)
+                <|> (symbol "&&" >> pure And)
+                <|> (symbol "||" >> pure Or)
+        v2 <- pVal @sig
+        pure $ op v1 v2
 
 pApp :: forall sig. (ParsableSig sig) => Parser (Exp sig (EffectSet sig))
 pApp = App <$> pVal @sig <*> pVal @sig
@@ -114,16 +137,21 @@ pVar :: forall sig. Parser (Val sig (EffectSet sig))
 pVar = IdentifierVal <$> identifier
 
 pNat :: forall sig. Parser (Val sig (EffectSet sig))
-pNat = NatVal . toPeano <$> L.decimal
+pNat = NatVal . toPeano <$> lexeme L.decimal
+    where
+    toPeano :: Integer -> Peano
+    toPeano 0 = Zero
+    toPeano n = Succ $ toPeano $ n - 1
+
 
 pBool :: forall sig. Parser (Val sig (EffectSet sig))
 pBool =
-    (symbol "true" >> pure (BoolVal True))
-        <|> (symbol "false" >> pure (BoolVal False))
+    (keyword "true" >> pure (BoolVal True))
+        <|> (keyword "false" >> pure (BoolVal False))
 
 pLam :: forall sig. (ParsableSig sig) => Parser (Val sig (EffectSet sig))
 pLam = do
-    void $ symbol "lambda" <|> symbol "λ"
+    void $ keyword "lambda" <|> void (symbol "λ")
     x <- identifier
     void $ symbol ":"
     t <- pType @sig
@@ -133,7 +161,7 @@ pLam = do
 
 pRecLam :: forall sig. (ParsableSig sig) => Parser (Val sig (EffectSet sig))
 pRecLam = do
-    void $ symbol "rec"
+    void $ keyword "rec"
     f <- identifier
     void $ symbol ":"
     fullType <- pType @sig
@@ -146,21 +174,24 @@ pRecLam = do
             pure $ RecLamVal f at x body
         _ -> fail "Recursive functions must have function type."
 
--- TODO: fix halt due to infinite recursion with invalid type
 pType :: forall sig. (ParsableSig sig) => Parser (ValType (EffectSet sig))
-pType =
-    (symbol "Nat" >> pure NatType)
-        <|> (symbol "Bool" >> pure BoolType)
-        <|> (ArrType <$> pArrType @sig)
-        <|> parens (pType @sig)
-
-pArrType :: forall sig. (ParsableSig sig) => Parser (ArrType' (EffectSet sig))
-pArrType = do
-    t1 <- pType @sig
-    void $ symbol "->"
-    eff <- pEffect @sig
-    t2 <- pType @sig
-    pure $ ArrType' (t1, eff, t2)
+pType = do
+    t1 <- pAtomType
+    ( try
+            ( do
+                void $ symbol "->"
+                eff <- pEffect @sig
+                t2 <- pType @sig
+                pure $ ArrType (ArrType' (t1, eff, t2))
+            )
+            <|> pure t1
+        )
+  where
+    pAtomType :: Parser (ValType (EffectSet sig))
+    pAtomType =
+        parens (pType @sig)
+            <|> (keyword "Nat" >> pure NatType)
+            <|> (keyword "Bool" >> pure BoolType)
 
 pEffect :: forall sig. (ParsableSig sig) => Parser (EffectSet sig)
 pEffect = do
@@ -169,7 +200,7 @@ pEffect = do
 
 pHandler :: forall sig. (ParsableSig sig) => Parser (Handler sig (EffectSet sig))
 pHandler = braces $ do
-    clauses <- many (try (pClause @sig))
+    clauses <- many (try (pClause @sig <* symbol ","))
     final <- pFinalClause @sig
     pure $ Handler (Map.fromList clauses) final
 
@@ -180,7 +211,6 @@ pClause = do
     void $ symbol "->"
     m <- (symbol "c" >> pure Continue) <|> (symbol "s" >> pure Stop)
     body <- pExp @sig
-    void $ symbol ","
     pure (op, Clause m params body)
 
 pFinalClause :: forall sig. (ParsableSig sig) => Parser (Identifier, Exp sig (EffectSet sig))
@@ -207,15 +237,23 @@ parens = between (symbol "(") (symbol ")")
 braces :: Parser a -> Parser a
 braces = between (symbol "{") (symbol "}")
 
+keyword :: String -> Parser ()
+keyword w = lexeme . try $ do
+    _ <- string w
+    notFollowedBy (satisfy (\c -> isAlphaNum c || c == '_'))
+
 identifier :: Parser String
 identifier = (lexeme . try) (p >>= check)
   where
-    p = (:) <$> letterChar <*> many alphaNumChar
-    check x = if x `elem` reserved then fail $ "keyword " ++ show x ++ " is reserved" else pure x
+    pStart = satisfy (\c -> isLetter c || c == '_')
+    pRest = satisfy (\c -> isAlphaNum c || c == '_' || c == '\'')
+    p = (:) <$> pStart <*> many pRest
+    check x =
+        if x `elem` reserved
+            then fail $ "Keyword " ++ show x ++ " is reserved"
+            else pure x
     reserved =
-        [ "semantics"
-        , "in"
-        , "do"
+        [ "do"
         , "return"
         , "if"
         , "then"
@@ -225,23 +263,16 @@ identifier = (lexeme . try) (p >>= check)
         , "handle"
         , "with"
         , "rec"
-        , "Nat"
-        , "Bool"
-        , "resume"
-        , "stop"
         , "lambda"
+        , "λ"
         ]
 
-toPeano :: Int -> Peano
-toPeano 0 = Zero
-toPeano n = Succ (toPeano (n - 1))
-
 instance ParsableSig NDSig where
-    pOp = symbol "choose" >> pure Choose
+    pOp = keyword "choose" >> pure Choose
 
 instance ParsableSig (ExceptionSig String) where
     pOp = do
-        void $ symbol "raise"
+        void $ keyword "raise"
         void $ symbol "<"
         e <- identifier
         void $ symbol ">"

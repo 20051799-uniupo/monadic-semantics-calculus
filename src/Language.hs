@@ -252,7 +252,7 @@ reducePure e = case e of
       where
         f x y
             | isZero x = y
-            | otherwise = succ $ f x (pred y)
+            | otherwise = succ $ f (pred x) y
     Minus (NatVal a) (NatVal b) -> Just $ Ret $ NatVal $ f a b
       where
         f x y
