@@ -1,5 +1,5 @@
 using Nondeterminism @ List {
-    do f = return (rec f: Nat -> {} Nat. n.
+    do f = return (rec f: Nat -> {} Nat. lambda n.
         do t = iszero n;
         if t
         then return n

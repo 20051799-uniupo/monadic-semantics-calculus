@@ -172,6 +172,7 @@ pRecLam = do
     case fullType of
         ArrType at -> do
             void $ symbol "."
+            void $ keyword "lambda" <|> void (symbol "λ")
             x <- identifier
             void $ symbol "."
             body <- pExp @sig
