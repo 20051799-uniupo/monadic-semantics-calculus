@@ -1,34 +1,28 @@
 module Main (main) where
 
-import Parser (pWhole, ParsedProgram (ParsedProgram))
+import Control.Monad (when)
+import Core (Conf (ExpConf), evalFin, reduceMnStep)
+import Data.Proxy (Proxy (..))
+import Options.Applicative (Parser, ParserInfo, execParser, help, helper, info, long, metavar, optional, strArgument, switch, (<**>))
+import Parser (ParsedProgram (ParsedProgram), pWhole)
 import Text.Megaparsec (errorBundlePretty, parse)
 import TypeCheck (typeOf)
-import Data.Proxy (Proxy(..))
-import Core (evalFin)
+import GHC.IO.Handle (hSetEcho)
+import GHC.IO.Handle.FD (stdin)
+
+data Opts = Opts
+    { inputFile :: Maybe FilePath
+    , step :: Bool
+    , printType :: Bool
+    }
 
 main :: IO ()
 main = do
-    -- let code = "using Nondeterminism @ List { handle do x = choose(); return x with { choose() ->c return true, x -> return x } }"
-    -- let code = "using Nondeterminism @ List { do x = return lambda x: (Nat ->{} Nat). return x; return x }"
-    -- let code = "using Nondeterminism @ List { \
-    --     \ do f = return (rec f: Nat -> {} Nat. n. \
-    --     \    do t = iszero n; \
-    --     \    if t then return 0 \
-    --     \    else do n1 = pred n; \
-    --     \         do t1 = iszero n1; \
-    --     \         if t1 then return n \
-    --     \         else do v1 = f n1; \
-    --     \              do n2 = pred n1; \
-    --     \              do v2 = f n2; \
-    --     \              v1 + v2); \
-    --     \ do n1 = succ 0; \
-    --     \ do n2 = succ n1; \
-    --     \ f n2 \
-    --     \ }"
-    -- let code = "using Nondeterminism @ List { returned }"
-    -- let code = "using Nondeterminism @ List { 0 + 0 }"
-    -- let code = "using Nondeterminism @ List { return (λx: Nat. return x) }"
-    let code = "using Nondeterminism @ List { return 1 }"
+    (opts :: Opts) <- execParser optsInfo
+
+    code <- case (inputFile opts) of
+        Just f -> readFile f
+        Nothing -> getContents
 
     case parse pWhole "" code of
         Left err -> putStrLn (errorBundlePretty err)
@@ -37,5 +31,23 @@ main = do
             case typeOf ast of
                 Left err -> putStrLn $ "Typing error: " ++ show err
                 Right t -> do
-                    putStrLn $ "Type: " ++ show t
-                    putStrLn $ "Result: " ++ (show $ evalFin @m ast)
+                    when (printType opts) $ putStrLn $ "Type: " ++ show t
+                    let evalStep m_conf = do
+                            putStrLn $ "Step: " ++ show m_conf
+                            _ <- getLine
+                            evalStep (reduceMnStep @m m_conf)
+                    if (step opts)
+                        then do
+                            hSetEcho stdin False
+                            evalStep (pure @m (ExpConf ast))
+                        else putStrLn $ "Result: " ++ (show $ evalFin @m ast)
+  where
+    optsInfo :: ParserInfo Opts
+    optsInfo = info (optsParser <**> helper) mempty
+    optsParser :: Parser Opts
+    optsParser =
+        Opts
+            <$> optional
+                (strArgument (metavar "FILE" <> help "Source file"))
+            <*> switch (long "step" <> help "Interactively reduce expression")
+            <*> switch (long "print-type" <> help "Print expression type-and-effect")

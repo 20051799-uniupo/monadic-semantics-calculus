@@ -210,17 +210,6 @@ Defines the arity and type of operations in the signature \( \Sigma \).
 class Sig s where
     arity :: s -> ([ValType e], ValType e)
 
-
-
-
-
--- class (Sig sig) => ParsableSig sig where
---     bindOp :: String -> Maybe sig
-
-
-
-
-
 {- | Abstract interface for the monadic semantics of operations.
 
 This connects the syntactic operation calls to the underlying monad.

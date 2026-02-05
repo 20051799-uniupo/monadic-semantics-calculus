@@ -10,7 +10,7 @@ import Text.Megaparsec
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
 
-import Core (Res)
+import Core (Conf, Res)
 import Data.Char (isAlphaNum, isLetter)
 import Effects.Exceptions (ExceptionSig (..))
 import Effects.Nondeterminism (NDSig (..))
@@ -20,7 +20,11 @@ import Types
 
 data Semantics
     = forall m sig.
-        (MonSem m sig, ParsableSig sig, Show (m (Res (Val sig (EffectSet sig))))) =>
+        ( MonSem m sig
+        , ParsableSig sig
+        , Show (m (Res (Val sig (EffectSet sig))))
+        , Show (m (Conf (Language.Exp sig (Types.EffectSet sig)) (Language.Val sig (Types.EffectSet sig))))
+        ) =>
       Semantics (Proxy m) (Proxy sig)
 
 semanticsRegistry :: Map (String, String) Semantics
@@ -38,6 +42,7 @@ data ParsedProgram
         ( MonSem m sig
         , ParsableSig sig
         , Show (m (Res (Val sig (EffectSet sig))))
+        , Show (m (Conf (Language.Exp sig (Types.EffectSet sig)) (Language.Val sig (Types.EffectSet sig))))
         ) =>
       ParsedProgram (Proxy m) (Exp sig (EffectSet sig))
 
@@ -138,11 +143,10 @@ pVar = IdentifierVal <$> identifier
 
 pNat :: forall sig. Parser (Val sig (EffectSet sig))
 pNat = NatVal . toPeano <$> lexeme L.decimal
-    where
+  where
     toPeano :: Integer -> Peano
     toPeano 0 = Zero
     toPeano n = Succ $ toPeano $ n - 1
-
 
 pBool :: forall sig. Parser (Val sig (EffectSet sig))
 pBool =
