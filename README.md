@@ -1,4 +1,4 @@
-# monadic-semantic-calculus
+# monadic-semantics-calculus
 
 This project implements an interpreter and a type-and-effect checker based on the abstract framework described in [Monadic Type-And-Effect-Soundness](https://doi.org/10.4230/LIPIcs.ECOOP.2025.7).
 
