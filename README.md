@@ -29,6 +29,9 @@ stack exec monadic-semantic-calculus-exe
 - `--print-type`: Print the inferred type and effect before execution.
 - `--help`: Show all available options.
 
+### Grammar
+Language grammar specification accessible [here](grammar/Expr.g4)
+
 ### Examples
 
 Run the Fibonacci example:
