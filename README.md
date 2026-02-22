@@ -30,7 +30,7 @@ stack exec monadic-semantic-calculus-exe
 - `--help`: Show all available options.
 
 ### Grammar
-Language grammar specification accessible [here](grammar/Expr.g4)
+Language grammar specification accessible [here](grammar/Expr.g4).
 
 ### Examples
 
