@@ -23,7 +23,7 @@ import Data.List (intercalate)
 import Data.Map (Map)
 import Data.Map qualified as Map
 
-import Nat (Nat (..))
+import Nat (Nat (..), natDiff, natDiv, natSum)
 import Types (ArrType' (..), Mode (..), ValType (ArrType))
 
 import Core (Reducible (..), Valuable (..))
@@ -133,6 +133,8 @@ data Exp sig e
       HandleWith (Exp sig e) (Handler sig e)
     | -- | Conditional \( \text{if } v \text{ then } e_1 \text{ else } e_2 \).
       If (Val sig e) (Exp sig e) (Exp sig e)
+    | -- | Division (primitive)
+      Div (Val sig e) (Val sig e)
     | -- | Addition (primitive).
       Plus (Val sig e) (Val sig e)
     | -- | Subtraction (primitive).
@@ -158,6 +160,7 @@ instance (Show sig, Show e) => Show (Exp sig e) where
                     Magic s vs -> show s ++ "(" ++ show vs ++ ")"
                     HandleWith e1 h -> "handle " ++ show e1 ++ " with " ++ show h
                     If p bThen bElse -> "if " ++ "(" ++ show p ++ ") then " ++ show bThen ++ " else " ++ show bElse
+                    Div (a) (b) -> show a ++ " / " ++ show b
                     Plus (a) (b) -> show a ++ " + " ++ show b
                     Minus (a) (b) -> show a ++ " - " ++ show b
                     And (a) (b) -> show a ++ " && " ++ show b
@@ -191,6 +194,7 @@ subst varName val e = case e of
     Magic s vs -> Magic s (substVal varName val <$> vs)
     HandleWith e1 h -> HandleWith (subst varName val e1) (substHandler varName val h)
     If p bThen bElse -> If (substVal varName val p) (subst varName val bThen) (subst varName val bElse)
+    Div (a) (b) -> Div (substVal varName val a) (substVal varName val b)
     Plus (a) (b) -> Plus (substVal varName val a) (substVal varName val b)
     Minus (a) (b) -> Minus (substVal varName val a) (substVal varName val b)
     And (a) (b) -> And (substVal varName val a) (substVal varName val b)
@@ -237,16 +241,9 @@ reducePure e = case e of
     App v@(RecLamVal f _ x body) arg -> Just $ (subst f v . subst x arg) body
     If (BoolVal True) bThen _ -> Just bThen
     If (BoolVal False) _ bElse -> Just bElse
-    Plus (NatVal a) (NatVal b) -> Just $ Ret $ NatVal $ f a b
-      where
-        f x y
-            | isZero x = y
-            | otherwise = succ $ f (pred x) y
-    Minus (NatVal a) (NatVal b) -> Just $ Ret $ NatVal $ f a b
-      where
-        f x y
-            | isZero y = x
-            | otherwise = f (pred x) (pred y)
+    Div (NatVal a) (NatVal b) -> Just $ Ret $ NatVal $ natDiv a b
+    Plus (NatVal a) (NatVal b) -> Just $ Ret $ NatVal $ natSum a b
+    Minus (NatVal a) (NatVal b) -> Just $ Ret $ NatVal $ natDiff a b
     And (BoolVal a) (BoolVal b) -> Just $ Ret $ BoolVal (a && b)
     Or (BoolVal a) (BoolVal b) -> Just $ Ret $ BoolVal (a || b)
     IsZero (NatVal n) -> Just $ Ret $ BoolVal $ isZero n

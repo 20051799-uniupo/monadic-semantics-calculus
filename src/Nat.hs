@@ -5,7 +5,7 @@ Description : Representation of natural numbers.
 This module provides an abstract interface and a concrete implementation for
 natural numbers (\\( \\mathbb{N} \\))
 -}
-module Nat (Nat (..), Peano (..)) where
+module Nat (Nat (..), Peano (..), natSum, natDiff, natDiv) where
 
 {- | A typeclass for types representing natural numbers \\( \\mathbb{N} \\).
 
@@ -17,6 +17,22 @@ class (Enum a) => Nat a where
 
     -- | Predicate testing if a number is zero.
     isZero :: a -> Bool
+
+natSum :: (Nat a, Nat b) => a -> b -> b
+natSum a b
+    | isZero a = b
+    | otherwise = succ $ natSum (pred a) b
+
+natDiff :: (Nat a, Nat b) => a -> b -> a
+natDiff a b
+    | isZero b = a
+    | otherwise = natDiff (pred a) (pred b)
+
+natDiv :: (Nat a, Nat b) => a -> b -> a
+natDiv a b
+    | isZero b = undefined
+    | fromEnum a < fromEnum b = zero
+    | otherwise = succ $ natDiv (natDiff a b) b
 
 -- | Inductively defined Peano representation of natural numbers.
 data Peano

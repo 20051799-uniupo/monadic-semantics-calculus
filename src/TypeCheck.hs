@@ -135,6 +135,10 @@ typeOfExp e ctx = case e of
         pure $ tT `join` tE
 
     -- Primitives
+    Div a b -> do
+        require a NatType ctx
+        require b NatType ctx
+        pure $ ExpType (NatType, mempty)
     Plus a b -> do
         require a NatType ctx
         require b NatType ctx

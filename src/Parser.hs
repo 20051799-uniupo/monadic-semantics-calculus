@@ -128,7 +128,8 @@ pPrim = try pBinary <|> pUnary
     pBinary = do
         v1 <- pVal @sig
         op <-
-            (symbol "+" >> pure Plus)
+            (symbol "/" >> pure Div)
+                <|> (symbol "+" >> pure Plus)
                 <|> (symbol "-" >> pure Minus)
                 <|> (symbol "&&" >> pure And)
                 <|> (symbol "||" >> pure Or)
